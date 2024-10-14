@@ -12,8 +12,8 @@ jobs:
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
-          apt update
-          apt -y install maven python3 pipx
+          sudo apt update
+          sudo apt -y install maven python3 pipx
           pipx install poetry
 
       - name: Setup GraalVM
