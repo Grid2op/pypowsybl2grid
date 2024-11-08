@@ -150,38 +150,38 @@ class PyPowSyBlBackend(Backend):
         # active and reactive power of loads
         loads = self._network.get_loads()
         for load_id, new_p in backend_action.load_p:
-            iidm_id = loads.iloc[load_id].name
+            iidm_id = str(loads.iloc[load_id].name)
             self._network.update_load_p(iidm_id, new_p)
 
         for load_id, new_q in backend_action.load_q:
-            iidm_id = loads.iloc[load_id].name
+            iidm_id = str(loads.iloc[load_id].name)
             self._network.update_load_q(iidm_id, new_q)
 
         # active power and voltage target of generators
         generators = self._network.get_generators()
         for gen_id, new_p in backend_action.prod_p:
-            iidm_id = generators.iloc[gen_id].name
+            iidm_id = str(generators.iloc[gen_id].name)
             self._network.update_generator_p(iidm_id, new_p)
 
         for gen_id, new_v in backend_action.prod_v:
-            iidm_id = generators.iloc[gen_id].name
+            iidm_id = str(generators.iloc[gen_id].name)
             self._network.update_generator_v(iidm_id, new_v)
 
         # active and reactive power of shunts
         shunts = self._network.get_shunts()
         for shunt_id, new_p in backend_action.shunt_p:
-            iidm_id = shunts.iloc[shunt_id].name
+            iidm_id = str(shunts.iloc[shunt_id].name)
             self._network.update_shunt_p(iidm_id, new_p)
 
         for shunt_id, new_q in backend_action.shunt_q:
-            iidm_id = shunts.iloc[shunt_id].name
+            iidm_id = str(shunts.iloc[shunt_id].name)
             self._network.update_shunt_q(iidm_id, new_q)
 
         # loads bus connection
         _, buses_dict = self._network.get_buses()
         loads_bus = backend_action.get_loads_bus_global()
         for load_id, new_bus in loads_bus:
-            iidm_id = loads.iloc[load_id].name
+            iidm_id = str(loads.iloc[load_id].name)
             if new_bus == -1:
                 self._network.disconnect_load(iidm_id)
             else:
@@ -191,7 +191,7 @@ class PyPowSyBlBackend(Backend):
         # generators bus connection
         generators_bus = backend_action.get_gens_bus_global()
         for gen_id, new_bus in generators_bus:
-            iidm_id = generators.iloc[gen_id].name
+            iidm_id = str(generators.iloc[gen_id].name)
             if new_bus == -1:
                 self._network.disconnect_generator(iidm_id)
             else:
@@ -201,7 +201,7 @@ class PyPowSyBlBackend(Backend):
         # shunts bus connection
         shunts_bus = backend_action.get_shunts_bus_global()
         for shunt_id, new_bus in shunts_bus:
-            iidm_id = shunts.iloc[shunt_id].name
+            iidm_id = str(shunts.iloc[shunt_id].name)
             if new_bus == -1:
                 self._network.disconnect_shunt(iidm_id)
             else:
@@ -212,7 +212,7 @@ class PyPowSyBlBackend(Backend):
         branches = self._network.get_branches()
         lines_or_bus = backend_action.get_lines_or_bus_global()
         for line_id, new_bus in lines_or_bus:
-            iidm_id = branches.iloc[line_id].name
+            iidm_id = str(branches.iloc[line_id].name)
             if new_bus == -1:
                 self._network.disconnect_branch_side1(iidm_id)
             else:
@@ -222,7 +222,7 @@ class PyPowSyBlBackend(Backend):
         # lines extremity bus connection
         lines_ex_bus = backend_action.get_lines_ex_bus_global()
         for line_id, new_bus in lines_ex_bus:
-            iidm_id = branches.iloc[line_id].name
+            iidm_id = str(branches.iloc[line_id].name)
             if new_bus == -1:
                 self._network.disconnect_branch_side2(iidm_id)
             else:

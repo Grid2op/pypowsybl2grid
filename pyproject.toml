@@ -12,7 +12,7 @@ numpy = "1.26.4"
 pandas = "^2.2.2"
 pandas-stubs = "^2.2.2"
 #pypowsybl = "^1.8.0"
-pypowsybl = { git = "https://github.com/powsybl/pypowsybl.git", branch = "pandapower_converter" }
+pypowsybl = { git = "https://github.com/powsybl/pypowsybl.git", branch = "update_topology_kind" }
 #grid2op = "^1.10.4
 grid2op = { git = "https://github.com/rte-france/Grid2Op.git", branch = "dev_1.10.4" }
 
