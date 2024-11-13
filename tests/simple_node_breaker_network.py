@@ -11,7 +11,18 @@ def setup():
     logging.basicConfig()
     logging.getLogger('powsybl').setLevel(logging.INFO)
 
-
+#
+#    GEN1                   LOAD1
+#     |                      |
+#   BBS1A --- COUPLER1 --- BBS1B
+#     |                      |
+#     |                      |
+#   LINE12                 LINE13
+#    |                       |
+#    |                       |
+#  BBS2 ----- LINE23 ----- BBS3
+#    |                       |
+#  LOAD2                   LOAD3
 def create_simple_node_breaker_network() -> Network:
     network = pp.network.create_empty("Simple node breaker network")
 
