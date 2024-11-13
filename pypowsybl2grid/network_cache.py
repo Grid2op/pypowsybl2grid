@@ -136,8 +136,9 @@ class NetworkCache(ABC):
         pass
 
     def convert_topo_to_bus_breaker(self):
-        voltage_level_ids = self._network.get_voltage_levels(attributes=[])
-        self._network.update_voltage_levels(id=voltage_level_ids.index, topology_kind=['BUS_BREAKER'] * len(voltage_level_ids))
+        voltage_levels = self.get_voltage_levels()
+        node_breaker_voltage_levels = voltage_levels[voltage_levels['topology_kind'] == 'NODE_BREAKER']
+        self._network.update_voltage_levels(id=node_breaker_voltage_levels.index, topology_kind=['BUS_BREAKER'] * len(node_breaker_voltage_levels))
 
 class NetworkCacheFactory(ABC):
 

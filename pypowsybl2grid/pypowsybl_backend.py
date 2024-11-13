@@ -8,9 +8,9 @@ import pandapower as pdp
 import pandas as pd
 import pypowsybl as pp
 from grid2op.Backend import Backend
-from grid2op.Exceptions import DivergingPowerflow
+from grid2op.Exceptions import DivergingPowerflow, BackendError
+from grid2op.Space import DEFAULT_N_BUSBAR_PER_SUB
 from pandas import DataFrame
-from pypowsybl import PyPowsyblError
 
 from pypowsybl2grid.fast_network_cache import FastNetworkCache
 from pypowsybl2grid.network_cache import DEFAULT_LF_PARAMETERS
@@ -24,12 +24,14 @@ class PyPowSyBlBackend(Backend):
                  can_be_copied: bool = True,
                  check_isolated_and_disconnected_injections = True,
                  consider_open_branch_reactive_flow = False,
+                 n_busbar_per_sub = DEFAULT_N_BUSBAR_PER_SUB,
                  lf_parameters: pp.loadflow.Parameters = DEFAULT_LF_PARAMETERS):
         Backend.__init__(self,
                          detailed_infos_for_cascading_failures=detailed_infos_for_cascading_failures,
                          can_be_copied=can_be_copied)
         self._check_isolated_and_disconnected_injections = check_isolated_and_disconnected_injections
         self._consider_open_branch_reactive_flow = consider_open_branch_reactive_flow
+        self.n_busbar_per_sub = n_busbar_per_sub
         self._lf_parameters = lf_parameters
 
         self.shunts_data_available = True
@@ -57,29 +59,33 @@ class PyPowSyBlBackend(Backend):
         self.n_sub = len(voltage_levels)
         self.name_sub = self.create_name(voltage_levels)
 
-        self.can_handle_more_than_2_busbar()
+        # FIXME waiting for being able to use switch actions with the backend in case of node/breaker voltage levels
+        # for now we convert all voltage level to bus/breaker ones
+        self._network.convert_topo_to_bus_breaker()
 
         # only one value for n_busbar_per_sub is allowed => use maximum one across all voltage levels
         buses, _ = self._network.get_buses()
-        max_bus_count = int(buses['local_num'].max()) + 1
-        if (voltage_levels['topology_kind'] == 'BUS_BREAKER').all():
-            if max_bus_count == 1:
-                # this is an academic data model like IEEE or matpower
-                # we create an additional busbar for all voltage levels
 
-                # we create other busbars for all voltage levels
-                for i in range(self.n_busbar_per_sub - 1):
-                    self._network.create_buses(id=voltage_levels.index + '_extra_busbar_' + str(i + 1),
-                                               voltage_level_id=voltage_levels.index)
-            else:
-                # as grid2op only allows to have same number of busbar section for all substations we need to set the n_busbar_per_sub
-                # to max number of voltage level one and handle an error when environment ask the back to connect to a not existing busbar (TODO)
-                self.n_busbar_per_sub = max_bus_count
-        else:
-            # FIXME waiting for being able to use switch actions with the backend in case of node/breaker voltage levels
-            # for now we convert all voltage level to bus/breaker ones
+        max_bus_count = int(buses['local_num'].max()) + 1
+        if self.n_busbar_per_sub is None:
+            if max_bus_count < 1:
+                raise BackendError("Network does not have any bus, it is impossible to define a n_busbar_per_sub")
             self.n_busbar_per_sub = max_bus_count
-            self._network.convert_topo_to_bus_breaker()
+        else:
+            if self.n_busbar_per_sub < max_bus_count:
+                raise BackendError(f"n_busbar_per_sub ({self.n_busbar_per_sub}) is lower than maximum number of bus ({max_bus_count}) of the network with the current topology")
+
+        # create additional buses so that each voltage level to reach max_bus_count
+        bus_count_by_voltage_level = buses.groupby('voltage_level_id')['local_num'].max().reset_index()
+        for _, row in bus_count_by_voltage_level.iterrows():
+            voltage_level_id = row['voltage_level_id']
+            bus_count = row['local_num'] + 1
+            bus_nums_to_create = range(bus_count, self.n_busbar_per_sub)
+            bus_ids = [f"{voltage_level_id}_extra_busbar_{i}" for i in bus_nums_to_create]
+            voltage_level_ids = [voltage_level_id] * len(bus_nums_to_create)
+            self._network.create_buses(id=bus_ids, voltage_level_id=voltage_level_ids)
+
+        self.can_handle_more_than_2_busbar()
 
         logger.info(f"{self.n_busbar_per_sub} busbars per substation")
 
