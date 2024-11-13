@@ -47,7 +47,7 @@ jobs:
         run: poetry run pytest
 
       - name: Copy PyPowSyBl wheel
-        run: cp $(find $HOME/.cache/pypoetry/artifacts/ -name pypowsybl*.whl)" dist/
+        run: cp $(find $HOME/.cache/pypoetry/artifacts/ -name pypowsybl*.whl) dist/
 
       - name: Upload wheel
         uses: actions/upload-artifact@v3
