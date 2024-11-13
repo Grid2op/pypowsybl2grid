@@ -23,13 +23,15 @@ class PyPowSyBlBackend(Backend):
                  detailed_infos_for_cascading_failures=False,
                  can_be_copied: bool = True,
                  check_isolated_and_disconnected_injections = True,
+                 consider_open_branch_reactive_flow = False,
                  lf_parameters: pp.loadflow.Parameters = DEFAULT_LF_PARAMETERS):
         Backend.__init__(self,
                          detailed_infos_for_cascading_failures=detailed_infos_for_cascading_failures,
                          can_be_copied=can_be_copied)
         self._check_isolated_and_disconnected_injections = check_isolated_and_disconnected_injections
-        self._detailed_infos_for_cascading_failures = detailed_infos_for_cascading_failures
+        self._consider_open_branch_reactive_flow = consider_open_branch_reactive_flow
         self._lf_parameters = lf_parameters
+
         self.shunts_data_available = True
         self.supported_grid_format = ("json", "xiidm", "txt")  # FIXME dynamically get supported extensions
 
@@ -303,8 +305,12 @@ class PyPowSyBlBackend(Backend):
         np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         branches = self._network.get_branches()
         p = np.nan_to_num(np.where(branches[connected_attr], branches[p_attr], 0))
-        q = np.nan_to_num(np.where(branches[connected_attr], branches[q_attr], 0))
-        a = np.nan_to_num(np.where(branches[connected_attr], branches[a_attr], 0))
+        if self._consider_open_branch_reactive_flow:
+            q = np.nan_to_num(branches[q_attr])
+            a = np.nan_to_num(branches[a_attr])
+        else:
+            q = np.nan_to_num(np.where(branches[connected_attr], branches[q_attr], 0))
+            a = np.nan_to_num(np.where(branches[connected_attr], branches[a_attr], 0))
         v = np.nan_to_num(np.where(branches[connected_attr], branches[v_attr], 0))
         return p, q, v, a
 

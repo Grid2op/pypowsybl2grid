@@ -35,7 +35,7 @@ class TestBackendPyPowSyBl(AAATestBackendAPI, unittest.TestCase):
 
 
 def test_backend_with_node_breaker_network():
-    backend = PyPowSyBlBackend(check_isolated_and_disconnected_injections=False)
+    backend = PyPowSyBlBackend(check_isolated_and_disconnected_injections=False, consider_open_branch_reactive_flow=True)
 
     n = create_simple_node_breaker_network()
     with tempfile.TemporaryDirectory() as tmp_dir_name:
