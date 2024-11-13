@@ -25,6 +25,19 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v4
 
+      # --> to remove when we will be able to a pypowsybl official release
+      - name: Checkout PowSyBl core snapshot sources
+        uses: actions/checkout@v4
+        with:
+          repository: powsybl/powsybl-core
+          ref: topology_model_conversion
+          path: powsybl-core
+
+      - name: Build and install PowSyBl core snapshot
+        shell: bash
+        run: mvn --batch-mode -DskipTests=true --file powsybl-core/pom.xml install
+      # <--
+
       - name: Install dependencies
         run: poetry install
 
