@@ -46,14 +46,11 @@ jobs:
       - name: Run tests
         run: poetry run pytest
 
-      - name: Find PyPowSyBl wheel
-        run: |
-          echo "PYPOWSYBL_WHEEL=$(find $HOME/.cache/pypoetry/artifacts/ -name pypowsybl*.whl)" >> $GITHUB_ENV
+      - name: Copy PyPowSyBl wheel
+        run: cp $(find $HOME/.cache/pypoetry/artifacts/ -name pypowsybl*.whl)" dist/
 
       - name: Upload wheel
         uses: actions/upload-artifact@v3
         with:
           name: pypowsybl2grid-wheels
-          path: |
-            dist/*.whl
-            $PYPOWSYBL_WHEEL
+          path: dist/*.whl
