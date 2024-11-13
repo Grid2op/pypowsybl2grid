@@ -34,7 +34,6 @@ jobs:
           path: powsybl-core
 
       - name: Build and install PowSyBl core snapshot
-        shell: bash
         run: mvn --batch-mode -DskipTests=true --file powsybl-core/pom.xml install
       # <--
 
@@ -46,3 +45,12 @@ jobs:
 
       - name: Run tests
         run: poetry run pytest
+
+      - name: Test
+        run: find $HOME/.cache/pypoetry/artifacts/ -name pypowsybl*.whl
+
+      - name: Upload wheel
+        uses: actions/upload-artifact@v3
+        with:
+          name: pypowsybl2grid-wheel
+          path: dist/*.whl
