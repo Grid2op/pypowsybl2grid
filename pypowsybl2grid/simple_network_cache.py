@@ -13,8 +13,10 @@ class SimpleNetworkCache(NetworkCache):
 
     def __init__(self, network: pp.network.Network, lf_parameters: pp.loadflow.Parameters):
         super().__init__(network, lf_parameters)
+        # TODO provide a way to define retained switches
+        self._reset_retained_switches()
 
-    def reset_retained_switches(self) -> None:
+    def _reset_retained_switches(self) -> None:
         logger.info("Reset all retained switches")
         switches = self._network.get_switches(attributes=NetworkCache.SWITCH_ATTRIBUTES)
         self._network.update_switches(id=switches.index, retained=[False] * len(switches))

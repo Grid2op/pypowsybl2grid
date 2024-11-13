@@ -50,10 +50,6 @@ class PyPowSyBlBackend(Backend):
             n = pp.network.load(full_path)
         self._network = FastNetworkCache(n, self._lf_parameters)
 
-        # remove all retained switches
-        # TODO provide a way to define retained switches
-        self._network.reset_retained_switches()
-
         # substations mapped to IIDM voltage levels
         voltage_levels = self._network.get_voltage_levels()
         self.n_sub = len(voltage_levels)
@@ -64,26 +60,24 @@ class PyPowSyBlBackend(Backend):
         # only one value for n_busbar_per_sub is allowed => use maximum one across all voltage levels
         buses, _ = self._network.get_buses()
         max_bus_count = int(buses['local_num'].max()) + 1
-        if max_bus_count == 1:
-            # this is a synthetic (like ieee) network
+        if (voltage_levels['topology_kind'] == 'BUS_BREAKER').all():
+            if max_bus_count == 1:
+                # this is an academic data model like IEEE or matpower
+                # we create an additional busbar for all voltage levels
 
-            # also check all voltage levels have a bus/breaker topo.
-            # it would be suspect to have a real node/breaker network with only 1 possible bus for all its voltage levels
-            if not (voltage_levels['topology_kind'] == 'BUS_BREAKER').all():
-                raise PyPowsyblError("pandapower is not installed")
-
-            # we create other busbars for all voltage levels
-            for i in range(self.n_busbar_per_sub - 1):
-                self._network.create_buses(id=voltage_levels.index + '_extra_busbar_' + str(i + 1),
-                               voltage_level_id=voltage_levels.index)
+                # we create other busbars for all voltage levels
+                for i in range(self.n_busbar_per_sub - 1):
+                    self._network.create_buses(id=voltage_levels.index + '_extra_busbar_' + str(i + 1),
+                                               voltage_level_id=voltage_levels.index)
+            else:
+                # as grid2op only allows to have same number of busbar section for all substations we need to set the n_busbar_per_sub
+                # to max number of voltage level one and handle an error when environment ask the back to connect to a not existing busbar (TODO)
+                self.n_busbar_per_sub = max_bus_count
         else:
-            # TODO
-            # we have a real network so we should not create extra busbars but we should probably
-            # - as grid2op only allow to have same number of busbar section for all substations we need to set the n_busnbar_per_substation
-            #   to max voltage level one and handle an error when environnement ask the back to connect to a not existing busbar
-            # - for a node/breaker network this is even more complex as we whould be able to map a topology to a set of switch
-            #   to action and also handle not existing configuration
+            # FIXME waiting for being able to use switch actions with the backend in case of node/breaker voltage levels
+            # for now we convert all voltage level to bus/breaker ones
             self.n_busbar_per_sub = max_bus_count
+            self._network.convert_topo_to_bus_breaker()
 
         logger.info(f"{self.n_busbar_per_sub} busbars per substation")
 
@@ -146,6 +140,8 @@ class PyPowSyBlBackend(Backend):
         # the following few lines are highly recommended
         if backend_action is None:
             return
+
+        logger.info("Apply action")
 
         # active and reactive power of loads
         loads = self._network.get_loads()

@@ -22,6 +22,8 @@ class FastNetworkCache(NetworkCache):
     def __init__(self, network: pp.network.Network, lf_parameters: pp.loadflow.Parameters):
         super().__init__(network, lf_parameters)
         self._fetch_switches()
+        # TODO provide a way to define retained switches
+        self._reset_retained_switches()
         self._fetch_voltage_levels()
         self._fetch_buses()
         self._fetch_loads()
@@ -156,7 +158,7 @@ class FastNetworkCache(NetworkCache):
         branches_state = self._network.get_branches(attributes=FastNetworkCache.BRANCH_STATE_ATTRIBUTES)
         FastNetworkCache._update(self._branches, branches_state)
 
-    def reset_retained_switches(self) -> None:
+    def _reset_retained_switches(self) -> None:
         logger.info("Reset all retained switches")
         self._network.update_switches(id=self._switches.index, retained=[False] * len(self._switches))
 

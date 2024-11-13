@@ -26,10 +26,6 @@ class NetworkCache(ABC):
         return self._network.id
 
     @abstractmethod
-    def reset_retained_switches(self) -> None:
-        pass
-
-    @abstractmethod
     def get_voltage_levels(self) -> pd.DataFrame:
         pass
 
@@ -139,6 +135,9 @@ class NetworkCache(ABC):
     def update_shunt_q(self, iidm_id: str, new_q: float) -> None:
         pass
 
+    def convert_topo_to_bus_breaker(self):
+        voltage_level_ids = self._network.get_voltage_levels(attributes=[])
+        self._network.update_voltage_levels(id=voltage_level_ids.index, topology_kind=['BUS_BREAKER'] * len(voltage_level_ids))
 
 class NetworkCacheFactory(ABC):
 

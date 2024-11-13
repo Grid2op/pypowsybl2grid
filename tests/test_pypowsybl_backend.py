@@ -1,4 +1,5 @@
 import logging
+import tempfile
 import unittest
 
 import pypowsybl as pp
@@ -7,6 +8,11 @@ from grid2op.dtypes import dt_float
 from grid2op.tests.aaa_test_backend_interface import AAATestBackendAPI
 
 from pypowsybl2grid.pypowsybl_backend import PyPowSyBlBackend
+
+import numpy as np
+import numpy.testing as npt
+
+from tests.simple_node_breaker_network import create_simple_node_breaker_network
 
 # needed config to make some grid2op test passing
 TEST_LOADFLOW_PARAMETERS = pp.loadflow.Parameters(distributed_slack=True,
@@ -18,7 +24,7 @@ TEST_LOADFLOW_PARAMETERS = pp.loadflow.Parameters(distributed_slack=True,
 @pytest.fixture(autouse=True)
 def setup():
     logging.basicConfig()
-    logging.getLogger('powsybl').setLevel(logging.ERROR)
+    logging.getLogger('powsybl').setLevel(logging.INFO)
 
 
 class TestBackendPyPowSyBl(AAATestBackendAPI, unittest.TestCase):
@@ -26,3 +32,48 @@ class TestBackendPyPowSyBl(AAATestBackendAPI, unittest.TestCase):
     def make_backend(self, detailed_infos_for_cascading_failures=False):
         self.tol_one = dt_float(1e-3)
         return PyPowSyBlBackend(detailed_infos_for_cascading_failures=detailed_infos_for_cascading_failures, lf_parameters=TEST_LOADFLOW_PARAMETERS)
+
+
+def test_backend_with_node_breaker_network():
+    backend = PyPowSyBlBackend(check_isolated_and_disconnected_injections=False)
+
+    n = create_simple_node_breaker_network()
+    with tempfile.TemporaryDirectory() as tmp_dir_name:
+        grid_file = tmp_dir_name + "grid.xiidm"
+        n.save(grid_file, 'XIIDM')
+        backend.load_grid(grid_file)
+
+    backend.assert_grid_correct()
+
+    conv, _ = backend.runpf()
+    assert conv
+
+    p_or, q_or, v_or, _ = backend.lines_or_info()
+    p_ex, q_ex, v_ex, _ = backend.lines_ex_info()
+    assert ['LINE12', 'LINE13', 'LINE23'] == backend.name_line.tolist()
+    tolerance = 1e-3
+    npt.assert_allclose(np.array([10.532, 12.469, -0.468]), p_or, rtol=tolerance, atol=tolerance)
+    npt.assert_allclose(np.array([4.0, 5.033, -0.015]), q_or, rtol=tolerance, atol=tolerance)
+    npt.assert_allclose(np.array([403.0, 403.0, 402.881]), v_or, rtol=tolerance, atol=tolerance)
+    npt.assert_allclose(np.array([-10.531, -12.468, 0.468]), p_ex, rtol=tolerance, atol=tolerance)
+    npt.assert_allclose(np.array([-3.984, -5.015, 0.015]), q_ex, rtol=tolerance, atol=tolerance)
+    npt.assert_allclose(np.array([402.773, 402.775, 402.775]), v_ex, rtol=tolerance, atol=tolerance)
+
+    # disconnect line 12
+    action = type(backend)._complete_action_class()
+    action.update({"set_line_status": [(0, -1)]})
+    bk_act = type(backend).my_bk_act_class()
+    bk_act += action
+    backend.apply_action(bk_act)
+
+    conv, _ = backend.runpf()
+    assert conv
+
+    p_or, q_or, v_or, _ = backend.lines_or_info()
+    p_ex, q_ex, v_ex, _ = backend.lines_ex_info()
+    npt.assert_allclose(np.array([0.0,  23.004, -11.0]), p_or, rtol=tolerance, atol=tolerance)
+    npt.assert_allclose(np.array([0.0,  9.079, -4.0]), q_or, rtol=tolerance, atol=tolerance)
+    npt.assert_allclose(np.array([0.0, 403.0, 402.324693]), v_or, rtol=tolerance, atol=tolerance)
+    npt.assert_allclose(np.array([0.0, -23.001,  11.001]), p_ex, rtol=tolerance, atol=tolerance)
+    npt.assert_allclose(np.array([0.0, -9.019,  4.019]), q_ex, rtol=tolerance, atol=tolerance)
+    npt.assert_allclose(np.array([0.0, 402.594, 402.594]), v_ex, rtol=tolerance, atol=tolerance)

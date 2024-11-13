@@ -170,8 +170,8 @@ test = ["pytest (>=6)"]
 
 [[package]]
 name = "Grid2Op"
-version = "1.10.4.dev1"
-description = "An gymnasium compatible environment to model sequential decision making  for powersystems"
+version = "1.11.0.dev0"
+description = "An gymnasium compatible environment to model sequential decision making for powersystems"
 optional = false
 python-versions = ">=3.8"
 files = []
@@ -200,9 +200,9 @@ test = ["gym (>=0.26)", "gymnasium", "gymnasium", "gymnasium", "imageio", "image
 
 [package.source]
 type = "git"
-url = "https://github.com/rte-france/Grid2Op.git"
-reference = "dev_1.10.4"
-resolved_reference = "3116d0e9579e8fd48424b63ad37521ae6b2e08e3"
+url = "https://github.com/Grid2Op/grid2op.git"
+reference = "dev_1.11.0"
+resolved_reference = "14e0bdbfe5f28549390c1d2db12832cce703fc54"
 
 [[package]]
 name = "idna"
@@ -369,13 +369,13 @@ files = [
 
 [[package]]
 name = "packaging"
-version = "24.1"
+version = "24.2"
 description = "Core utilities for Python packages"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "packaging-24.1-py3-none-any.whl", hash = "sha256:5b8f2217dbdbd2f7f384c41c628544e6d52f2d0f53c6d0c3ea61aa5d1d7ff124"},
-    {file = "packaging-24.1.tar.gz", hash = "sha256:026ed72c8ed3fcce5bf8950572258698927fd1dbda10a5e981cdf0ac37f4f002"},
+    {file = "packaging-24.2-py3-none-any.whl", hash = "sha256:09abb1bccd265c01f4a3aa3f7a7db064b36514d2cba19a2f694fe6150451a759"},
+    {file = "packaging-24.2.tar.gz", hash = "sha256:c228a6dc5e932d346bc5739379109d49e8853dd8223571c7c5b55260edc0b97f"},
 ]
 
 [[package]]
@@ -542,7 +542,7 @@ tests = ["pytest", "pytest-cov", "pytest-lazy-fixtures"]
 
 [[package]]
 name = "pypowsybl"
-version = "1.8.0.dev1"
+version = "1.9.0.dev1"
 description = "A PowSyBl Python API"
 optional = false
 python-versions = ">=3.8"
@@ -555,13 +555,13 @@ pandas = {version = ">=2.2.2", markers = "python_version >= \"3.9\""}
 prettytable = ">=2.0.0"
 
 [package.extras]
-extra = ["pandapower (>=2.4.11)"]
+pandapower = ["pandapower (>=2.4.11)"]
 
 [package.source]
 type = "git"
 url = "https://github.com/powsybl/pypowsybl.git"
 reference = "update_topology_kind"
-resolved_reference = "001470b1aa3027c3ee3eb9248aa68ac06c83fbe3"
+resolved_reference = "6492670d224f3056bc26f193be8c6a3f084d7d25"
 
 [[package]]
 name = "pytest"
@@ -686,24 +686,24 @@ files = [
 
 [[package]]
 name = "tomli"
-version = "2.0.2"
+version = "2.1.0"
 description = "A lil' TOML parser"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "tomli-2.0.2-py3-none-any.whl", hash = "sha256:2ebe24485c53d303f690b0ec092806a085f07af5a5aa1464f3931eec36caaa38"},
-    {file = "tomli-2.0.2.tar.gz", hash = "sha256:d46d457a85337051c36524bc5349dd91b1877838e2979ac5ced3e710ed8a60ed"},
+    {file = "tomli-2.1.0-py3-none-any.whl", hash = "sha256:a5c57c3d1c56f5ccdf89f6523458f60ef716e210fc47c4cfb188c5ba473e0391"},
+    {file = "tomli-2.1.0.tar.gz", hash = "sha256:3f646cae2aec94e17d04973e4249548320197cfabdf130015d023de4b74d8ab8"},
 ]
 
 [[package]]
 name = "tqdm"
-version = "4.66.6"
+version = "4.67.0"
 description = "Fast, Extensible Progress Meter"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "tqdm-4.66.6-py3-none-any.whl", hash = "sha256:223e8b5359c2efc4b30555531f09e9f2f3589bcd7fdd389271191031b49b7a63"},
-    {file = "tqdm-4.66.6.tar.gz", hash = "sha256:4bdd694238bef1485ce839d67967ab50af8f9272aab687c0d7702a01da0be090"},
+    {file = "tqdm-4.67.0-py3-none-any.whl", hash = "sha256:0cd8af9d56911acab92182e88d763100d4788bdf421d251616040cc4d44863be"},
+    {file = "tqdm-4.67.0.tar.gz", hash = "sha256:fe5a6f95e6fe0b9755e9469b77b9c3cf850048224ecaa8293d7d2d31f97d869a"},
 ]
 
 [package.dependencies]
@@ -711,6 +711,7 @@ colorama = {version = "*", markers = "platform_system == \"Windows\""}
 
 [package.extras]
 dev = ["pytest (>=6)", "pytest-cov", "pytest-timeout", "pytest-xdist"]
+discord = ["requests"]
 notebook = ["ipywidgets (>=6)"]
 slack = ["slack-sdk"]
 telegram = ["requests"]
@@ -779,4 +780,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "0495bb7444b3d1349b44b969a57ad5d96f8cb4bbd85e27ebf1ee7aa60f07c795"
+content-hash = "3c457fe63c01a766caa30b723339da967578b1a7aec893a2279815ae77b22c3d"
