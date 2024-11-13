@@ -1,3 +1,9 @@
+# Copyright (c) 2024, RTE (http://www.rte-france.com)
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# SPDX-License-Identifier: MPL-2.0
+
 import pandas as pd
 import pypowsybl as pp
 import pytest
@@ -6,7 +12,6 @@ from numpy import nan
 from pypowsybl2grid.fast_network_cache import FastNetworkCacheFactory
 from pypowsybl2grid.network_cache import NetworkCacheFactory
 from pypowsybl2grid.simple_network_cache import SimpleNetworkCacheFactory
-
 
 @pytest.fixture(autouse=True)
 def setup():
