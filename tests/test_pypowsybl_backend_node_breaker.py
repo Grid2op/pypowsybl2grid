@@ -4,9 +4,11 @@ from typing import Dict
 
 import numpy as np
 import numpy.testing as npt
+import pypowsybl as pp
 import pytest
 from pypowsybl.network import Network
 
+from pypowsybl2grid.network_cache import DEFAULT_LF_PARAMETERS
 from pypowsybl2grid.pypowsybl_backend import PyPowSyBlBackend
 from tests.simple_node_breaker_network import create_simple_node_breaker_network
 
@@ -18,9 +20,10 @@ def setup():
     logging.getLogger('powsybl').setLevel(logging.INFO)
 
 
-def create_backend():
+def create_backend(lf_parameters: pp.loadflow.Parameters = DEFAULT_LF_PARAMETERS):
     return PyPowSyBlBackend(check_isolated_and_disconnected_injections=False,
-                            consider_open_branch_reactive_flow=True)
+                            consider_open_branch_reactive_flow=True,
+                            lf_parameters=lf_parameters)
 
 
 def load_grid(backend: PyPowSyBlBackend, network: Network):
@@ -137,7 +140,7 @@ def test_backend_with_node_breaker_network_and_an_initial_topo():
     assert [2, 1, 1, 2, 1, 1, 1, 1, 1, 1] == backend.get_topo_vect().tolist()
 
 
-def test_backend_with_node_breaker_network_and_():
+def test_backend_with_node_breaker_network_and_load_change():
     backend = create_backend()
 
     n = create_simple_node_breaker_network()
@@ -147,10 +150,53 @@ def test_backend_with_node_breaker_network_and_():
     conv, _ = backend.runpf()
     assert conv
 
-    p, q, v = backend.generators_info()
-    npt.assert_allclose(np.array([33.0]), p, rtol=TOLERANCE, atol=TOLERANCE)
-    npt.assert_allclose(np.array([12.033]), q, rtol=TOLERANCE, atol=TOLERANCE)
-    npt.assert_allclose(np.array([403.0]), v, rtol=TOLERANCE, atol=TOLERANCE)
+    gen_p, gen_q, gen_v = backend.generators_info()
+    npt.assert_allclose(np.array([33.0]), gen_p, rtol=TOLERANCE, atol=TOLERANCE)
+    npt.assert_allclose(np.array([12.033]), gen_q, rtol=TOLERANCE, atol=TOLERANCE)
+    npt.assert_allclose(np.array([403.0]), gen_v, rtol=TOLERANCE, atol=TOLERANCE)
+
+    load_p, load_q, load_v = backend.loads_info()
+    npt.assert_allclose(np.array([10.0, 11.0, 12.0]), load_p, rtol=TOLERANCE, atol=TOLERANCE)
+    npt.assert_allclose(np.array([3.0, 4.0, 5.0]), load_q, rtol=TOLERANCE, atol=TOLERANCE)
+    npt.assert_allclose(np.array([403.0, 402.773, 402.775]), load_v, rtol=TOLERANCE, atol=TOLERANCE)
+
+    apply_action(backend, {"injection": {"load_p": [10.0, 11.0, 30.0],
+                                                   "load_q": [3.0, 4.0, 5.0]}})
+
+    conv, _ = backend.runpf()
+    assert conv
+
+    gen_p, gen_q, gen_v = backend.generators_info()
+    npt.assert_allclose(np.array([51.005]), gen_p, rtol=TOLERANCE, atol=TOLERANCE)
+    npt.assert_allclose(np.array([12.101]), gen_q, rtol=TOLERANCE, atol=TOLERANCE)
+    npt.assert_allclose(np.array([403.0]), gen_v, rtol=TOLERANCE, atol=TOLERANCE)
+
+    load_p, load_q, load_v = backend.loads_info()
+    npt.assert_allclose(np.array([10.0, 11.0, 30.0]), load_p, rtol=TOLERANCE, atol=TOLERANCE)
+    npt.assert_allclose(np.array([3.0, 4.0, 5.0]), load_q, rtol=TOLERANCE, atol=TOLERANCE)
+    npt.assert_allclose(np.array([403.0, 402.773, 402.775]), load_v, rtol=TOLERANCE, atol=TOLERANCE)
+
+
+def test_backend_with_node_breaker_network_and_generation_change():
+    parameters = pp.loadflow.Parameters(voltage_init_mode=pp.loadflow.VoltageInitMode.DC_VALUES, balance_type=pp.loadflow.BalanceType.PROPORTIONAL_TO_LOAD)
+    backend = create_backend(parameters)
+
+    n = create_simple_node_breaker_network()
+
+    load_grid(backend, n)
+
+    conv, _ = backend.runpf()
+    assert conv
+
+    gen_p, gen_q, gen_v = backend.generators_info()
+    npt.assert_allclose(np.array([33.0]), gen_p, rtol=TOLERANCE, atol=TOLERANCE)
+    npt.assert_allclose(np.array([12.033]), gen_q, rtol=TOLERANCE, atol=TOLERANCE)
+    npt.assert_allclose(np.array([403.0]), gen_v, rtol=TOLERANCE, atol=TOLERANCE)
+
+    load_p, load_q, load_v = backend.loads_info()
+    npt.assert_allclose(np.array([10.0, 11.0, 12.0]), load_p, rtol=TOLERANCE, atol=TOLERANCE)
+    npt.assert_allclose(np.array([3.0, 4.0, 5.0]), load_q, rtol=TOLERANCE, atol=TOLERANCE)
+    npt.assert_allclose(np.array([403.0, 402.773, 402.775]), load_v, rtol=TOLERANCE, atol=TOLERANCE)
 
     apply_action(backend, {"injection": {"prod_p": [43.0],
                                                    "prod_v": [403.0]}})
@@ -158,7 +204,28 @@ def test_backend_with_node_breaker_network_and_():
     conv, _ = backend.runpf()
     assert conv
 
-    p, q, v = backend.generators_info()
-    npt.assert_allclose(np.array([33.0]), p, rtol=TOLERANCE, atol=TOLERANCE)
-    npt.assert_allclose(np.array([12.033]), q, rtol=TOLERANCE, atol=TOLERANCE)
-    npt.assert_allclose(np.array([403.0]), v, rtol=TOLERANCE, atol=TOLERANCE)
+    gen_p, gen_q, gen_v = backend.generators_info()
+    npt.assert_allclose(np.array([43.0]), gen_p, rtol=TOLERANCE, atol=TOLERANCE)
+    npt.assert_allclose(np.array([12.052]), gen_q, rtol=TOLERANCE, atol=TOLERANCE)
+    npt.assert_allclose(np.array([403.0]), gen_v, rtol=TOLERANCE, atol=TOLERANCE)
+
+    load_p, load_q, load_v = backend.loads_info()
+    npt.assert_allclose(np.array([13.029, 14.332, 15.635]), load_p, rtol=TOLERANCE, atol=TOLERANCE)
+    npt.assert_allclose(np.array([3.0, 4.0, 5.0]), load_q, rtol=TOLERANCE, atol=TOLERANCE)
+    npt.assert_allclose(np.array([403.0, 402.773, 402.775]), load_v, rtol=TOLERANCE, atol=TOLERANCE)
+
+    apply_action(backend, {"injection": {"prod_p": [33.0],
+                                                   "prod_v": [410.0]}})
+
+    conv, _ = backend.runpf()
+    assert conv
+
+    gen_p, gen_q, gen_v = backend.generators_info()
+    npt.assert_allclose(np.array([33.0]), gen_p, rtol=TOLERANCE, atol=TOLERANCE)
+    npt.assert_allclose(np.array([12.032]), gen_q, rtol=TOLERANCE, atol=TOLERANCE)
+    npt.assert_allclose(np.array([410.0]), gen_v, rtol=TOLERANCE, atol=TOLERANCE)
+
+    load_p, load_q, load_v = backend.loads_info()
+    npt.assert_allclose(np.array([10.0, 11.0, 12.0]), load_p, rtol=TOLERANCE, atol=TOLERANCE)
+    npt.assert_allclose(np.array([3.0, 4.0, 5.0]), load_q, rtol=TOLERANCE, atol=TOLERANCE)
+    npt.assert_allclose(np.array([410.0, 409.776, 409.779]), load_v, rtol=TOLERANCE, atol=TOLERANCE)
