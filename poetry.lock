@@ -561,7 +561,7 @@ pandapower = ["pandapower (>=2.4.11)"]
 type = "git"
 url = "https://github.com/powsybl/pypowsybl.git"
 reference = "update_topology_kind"
-resolved_reference = "6492670d224f3056bc26f193be8c6a3f084d7d25"
+resolved_reference = "435634c547163a8b502f8e011da021fa1c9bba4e"
 
 [[package]]
 name = "pytest"
