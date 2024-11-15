@@ -27,6 +27,12 @@ class FastNetworkCache(NetworkCache):
 
     def __init__(self, network: pp.network.Network, lf_parameters: pp.loadflow.Parameters):
         super().__init__(network, lf_parameters)
+        # everything is up-to-date
+        self._buses_topo_to_update = False
+        self._loads_topo_to_update = []
+        self._generators_topo_to_update = []
+        self._shunts_topo_to_update = []
+        self._branches_topo_to_update = []
         self._fetch_switches()
         # TODO provide a way to define retained switches
         self._reset_retained_switches()
@@ -135,7 +141,15 @@ class FastNetworkCache(NetworkCache):
         # update injection state columns
         FastNetworkCache._update(injections, injections_state)
 
+    def _fetch_full_topo(self) -> None:
+        self._fetch_branch_topo()
+        self._fetch_load_topo()
+        self._fetch_generator_topo()
+        self._fetch_shunt_topo()
+
     def _fetch_full_state(self) -> None:
+        self._fetch_full_topo()
+
         # update buses state columns
         buses_state = self._network.get_bus_breaker_view_buses(attributes=FastNetworkCache.BUS_STATE_ATTRIBUTES)
         self._buses.update(buses_state)
@@ -172,21 +186,29 @@ class FastNetworkCache(NetworkCache):
         return self._voltage_levels
 
     def get_buses(self) -> Tuple[pd.DataFrame, Dict[int, str]]:
+        self._fetch_bus_topo()
         return self._buses, self._buses_dict
 
     def get_loads(self) -> pd.DataFrame:
+        self._fetch_branch_topo() # because a branch connection change can cause an injection connection change
+        self._fetch_load_topo()
         return self._loads
 
     def get_generators(self) -> pd.DataFrame:
+        self._fetch_branch_topo() # because a branch connection change can cause an injection connection change
+        self._fetch_generator_topo()
         return self._generators
 
     def get_shunts(self) -> pd.DataFrame:
+        self._fetch_branch_topo() # because a branch connection change can cause an injection connection change
+        self._fetch_shunt_topo()
         return self._shunts
 
     def get_batteries(self) -> pd.DataFrame:
         return self._batteries
 
     def get_branches(self) -> pd.DataFrame:
+        self._fetch_branch_topo()
         return self._branches
 
     def get_branches_with_limits(self) -> pd.DataFrame:
@@ -219,56 +241,81 @@ class FastNetworkCache(NetworkCache):
             left_on='bus_breaker_bus_id', how='left')
         FastNetworkCache._update(injections, injections_merged_with_buses_topo)
 
-    def _fetch_load_topo(self, iidm_id: str) -> None:
+    def _fetch_load_topo(self) -> None:
+        if len(self._loads_topo_to_update) == 0:
+            return
         self._fetch_bus_topo()
         buses_topo = self._buses[FastNetworkCache.MERGE_BUS_TOPO_ATTRIBUTES]
-        self._fetch_injection_topo(self._loads, self._network.get_loads(id=iidm_id,
+        self._fetch_injection_topo(self._loads, self._network.get_loads(id=self._loads_topo_to_update,
                                                                         attributes=FastNetworkCache.INJECTION_TOPO_ATTRIBUTES),
                                    buses_topo)
+        self._loads_topo_to_update.clear()
+
+    def _invalidate_loads_topo(self, iidm_id: str) -> None:
+        self._loads_topo_to_update.append(iidm_id)
+        self._buses_topo_to_update = True
 
     def disconnect_load(self, iidm_id: str) -> None:
         self._network.update_loads(id=iidm_id, connected=False)
-        self._fetch_load_topo(iidm_id)
+        self._invalidate_loads_topo(iidm_id)
 
     def connected_load(self, iidm_id: str, new_bus_id: str) -> None:
         self._network.update_loads(id=iidm_id, bus_breaker_bus_id=new_bus_id, connected=True)
-        self._fetch_load_topo(iidm_id)
+        self._invalidate_loads_topo(iidm_id)
 
-    def _fetch_generator_topo(self, iidm_id: str) -> None:
+    def _fetch_generator_topo(self) -> None:
+        if len(self._generators_topo_to_update) == 0:
+            return
         self._fetch_bus_topo()
         buses_topo = self._buses[FastNetworkCache.MERGE_BUS_TOPO_ATTRIBUTES]
-        self._fetch_injection_topo(self._generators, self._network.get_generators(id=iidm_id,
+        self._fetch_injection_topo(self._generators, self._network.get_generators(id=self._generators_topo_to_update,
                                                                                   attributes=FastNetworkCache.INJECTION_TOPO_ATTRIBUTES),
                                    buses_topo)
+        self._generators_topo_to_update.clear()
+
+    def _invalidate_generators_topo(self, iidm_id: str) -> None:
+        self._generators_topo_to_update.append(iidm_id)
+        self._buses_topo_to_update = True
 
     def disconnect_generator(self, iidm_id: str) -> None:
         self._network.update_generators(id=iidm_id, connected=False)
-        self._fetch_generator_topo(iidm_id)
+        self._invalidate_generators_topo(iidm_id)
 
     def connected_generator(self, iidm_id: str, new_bus_id: str) -> None:
         self._network.update_generators(id=iidm_id, bus_breaker_bus_id=new_bus_id, connected=True)
-        self._fetch_generator_topo(iidm_id)
+        self._invalidate_generators_topo(iidm_id)
 
-    def _fetch_shunt_topo(self, iidm_id: str) -> None:
+    def _fetch_shunt_topo(self) -> None:
+        if len(self._shunts_topo_to_update) == 0:
+            return
         self._fetch_bus_topo()
         buses_topo = self._buses[FastNetworkCache.MERGE_BUS_TOPO_ATTRIBUTES]
-        self._fetch_injection_topo(self._shunts, self._network.get_shunt_compensators(id=iidm_id,
+        self._fetch_injection_topo(self._shunts, self._network.get_shunt_compensators(id=self._shunts_topo_to_update,
                                                                                       attributes=FastNetworkCache.INJECTION_TOPO_ATTRIBUTES),
                                    buses_topo)
+        self._shunts_topo_to_update.clear()
+
+    def _invalidate_shunts_topo(self, iidm_id: str) -> None:
+        self._shunts_topo_to_update.append(iidm_id)
+        self._buses_topo_to_update = True
 
     def disconnect_shunt(self, iidm_id: str) -> None:
         self._network.update_shunt_compensators(id=iidm_id, connected=False)
-        self._fetch_shunt_topo(iidm_id)
+        self._invalidate_shunts_topo(iidm_id)
 
     def connected_shunt(self, iidm_id: str, new_bus_id: str) -> None:
         self._network.update_shunt_compensators(id=iidm_id, bus_breaker_bus_id=new_bus_id, connected=True)
-        self._fetch_shunt_topo(iidm_id)
+        self._invalidate_shunts_topo(iidm_id)
 
     def _fetch_bus_topo(self) -> None:
-        buses_topo_update = self._network.get_bus_breaker_view_buses(attributes=FastNetworkCache.BUS_TOPO_ATTRIBUTES)
-        FastNetworkCache._update(self._buses, buses_topo_update)
+        if self._buses_topo_to_update:
+            buses_topo_update = self._network.get_bus_breaker_view_buses(attributes=FastNetworkCache.BUS_TOPO_ATTRIBUTES)
+            FastNetworkCache._update(self._buses, buses_topo_update)
+            self._buses_topo_to_update = False
 
     def _fetch_branch_topo(self) -> None:
+        if len(self._branches_topo_to_update) == 0:
+            return
         # update buses because of potential synchronous component update
         self._fetch_bus_topo()
         buses_topo = self._buses[FastNetworkCache.MERGE_BUS_TOPO_ATTRIBUTES]
@@ -293,22 +340,30 @@ class FastNetworkCache(NetworkCache):
         self._fetch_injection_topo(self._shunts,
                                    self._network.get_shunt_compensators(attributes=FastNetworkCache.INJECTION_TOPO_ATTRIBUTES),
                                    buses_topo)
+        self._branches_topo_to_update.clear()
+        self._loads_topo_to_update.clear()
+        self._generators_topo_to_update.clear()
+        self._shunts_topo_to_update.clear()
+
+    def _invalidate_branches_topo(self, iidm_id: str) -> None:
+        self._branches_topo_to_update.append(iidm_id)
+        self._buses_topo_to_update = True
 
     def disconnect_branch_side1(self, iidm_id: str) -> None:
         self._network.update_branches(id=iidm_id, connected1=False)
-        self._fetch_branch_topo()
+        self._invalidate_branches_topo(iidm_id)
 
     def connect_branch_side1(self, iidm_id: str, new_bus_id: str) -> None:
         self._network.update_branches(id=iidm_id, bus_breaker_bus1_id=new_bus_id, connected1=True)
-        self._fetch_branch_topo()
+        self._invalidate_branches_topo(iidm_id)
 
     def disconnect_branch_side2(self, iidm_id: str) -> None:
         self._network.update_branches(id=iidm_id, connected2=False)
-        self._fetch_branch_topo()
+        self._invalidate_branches_topo(iidm_id)
 
     def connect_branch_side2(self, iidm_id: str, new_bus_id: str) -> None:
         self._network.update_branches(id=iidm_id, bus_breaker_bus2_id=new_bus_id, connected2=True)
-        self._fetch_branch_topo()
+        self._invalidate_branches_topo(iidm_id)
 
     def update_load_p(self, iidm_id: str, new_p: float) -> None:
         self._network.update_loads(id=iidm_id, p0=new_p)
