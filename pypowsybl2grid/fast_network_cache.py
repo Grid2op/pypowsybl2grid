@@ -370,27 +370,27 @@ class FastNetworkCache(NetworkCache):
         self._network.update_branches(id=iidm_id, bus_breaker_bus2_id=new_bus_id, connected2=True)
         self._invalidate_branches_topo(iidm_id)
 
-    def update_load_p(self, iidm_id: str, new_p: float) -> None:
+    def update_load_p(self, iidm_id: List[str], new_p: List[float]) -> None:
         self._network.update_loads(id=iidm_id, p0=new_p)
         # not need to update until LF ran again
 
-    def update_load_q(self, iidm_id: str, new_q: float) -> None:
+    def update_load_q(self, iidm_id: List[str], new_q: List[float]) -> None:
         self._network.update_loads(id=iidm_id, q0=new_q)
         # not need to update until LF ran again
 
-    def update_generator_p(self, iidm_id: str, new_p: float) -> None:
+    def update_generator_p(self, iidm_id: List[str], new_p: List[float]) -> None:
         self._network.update_generators(id=iidm_id, target_p=new_p)
         # not need to update until LF ran again
 
-    def update_generator_v(self, iidm_id: str, new_v: float) -> None:
+    def update_generator_v(self, iidm_id: List[str], new_v: List[float]) -> None:
         self._network.update_generators(id=iidm_id, target_v=new_v)
         # not need to update until LF ran again
 
-    def update_shunt_p(self, iidm_id: str, new_p: float) -> None:
+    def update_shunt_p(self, iidm_id: List[str], new_p: List[float]) -> None:
         # FIXME how to deal with discrete shunts?
         pass
 
-    def update_shunt_q(self, iidm_id: str, new_q: float) -> None:
+    def update_shunt_q(self, iidm_id: List[str], new_q: List[float]) -> None:
         # FIXME how to deal with discrete shunts?
         pass
 

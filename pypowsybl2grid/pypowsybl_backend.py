@@ -175,31 +175,55 @@ class PyPowSyBlBackend(Backend):
         branch_ids = self._network.get_branch_ids()
 
         # active and reactive power of loads
+        load_ids_to_update = []
+        load_p_to_update = []
         for load_id, new_p in backend_action.load_p:
             iidm_id = str(load_ids[load_id])
-            self._network.update_load_p(iidm_id, new_p)
+            load_ids_to_update.append(iidm_id)
+            load_p_to_update.append(new_p)
+        self._network.update_load_p(load_ids_to_update, load_p_to_update)
 
+        load_ids_to_update.clear()
+        load_q_to_update = []
         for load_id, new_q in backend_action.load_q:
             iidm_id = str(load_ids[load_id])
-            self._network.update_load_q(iidm_id, new_q)
+            load_ids_to_update.append(iidm_id)
+            load_q_to_update.append(new_q)
+        self._network.update_load_q(load_ids_to_update, load_q_to_update)
 
         # active power and voltage target of generators
+        gen_ids_to_update = []
+        gen_p_to_update = []
         for gen_id, new_p in backend_action.prod_p:
             iidm_id = str(generator_ids[gen_id])
-            self._network.update_generator_p(iidm_id, new_p)
+            gen_ids_to_update.append(iidm_id)
+            gen_p_to_update.append(new_p)
+        self._network.update_generator_p(gen_ids_to_update, gen_p_to_update)
 
+        gen_ids_to_update.clear()
+        gen_v_to_update = []
         for gen_id, new_v in backend_action.prod_v:
             iidm_id = str(generator_ids[gen_id])
-            self._network.update_generator_v(iidm_id, new_v)
+            gen_ids_to_update.append(iidm_id)
+            gen_v_to_update.append(new_v)
+        self._network.update_generator_v(gen_ids_to_update, gen_v_to_update)
 
         # active and reactive power of shunts
+        shunt_ids_to_update = []
+        shunt_p_to_update = []
         for shunt_id, new_p in backend_action.shunt_p:
             iidm_id = str(shunt_ids[shunt_id])
-            self._network.update_shunt_p(iidm_id, new_p)
+            shunt_ids_to_update.append(iidm_id)
+            shunt_p_to_update.append(new_p)
+        self._network.update_shunt_p(shunt_ids_to_update, shunt_p_to_update)
 
+        shunt_ids_to_update.clear()
+        shunt_q_to_update = []
         for shunt_id, new_q in backend_action.shunt_q:
             iidm_id = str(shunt_ids[shunt_id])
-            self._network.update_shunt_q(iidm_id, new_q)
+            shunt_ids_to_update.append(iidm_id)
+            shunt_q_to_update.append(new_q)
+        self._network.update_shunt_q(shunt_ids_to_update, shunt_q_to_update)
 
         # loads bus connection
         loads_bus = backend_action.get_loads_bus_global()

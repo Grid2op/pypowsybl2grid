@@ -89,8 +89,8 @@ def run_network_cache_test(network_cache_factory: NetworkCacheFactory):
     assert ['NHV1_NHV2_1', 'NHV1_NHV2_2', 'NGEN_NHV1', 'NHV2_NLOAD'] == cache.get_branch_ids()
 
     # test load modification
-    cache.update_load_p('LOAD', 700.0)
-    cache.update_load_q('LOAD', 300.0)
+    cache.update_load_p(['LOAD'], [700.0])
+    cache.update_load_q(['LOAD'], [300.0])
     cache.run_ac_pf()
     loads = cache.get_loads()
     expected_loads = pd.DataFrame(index=pd.Series(name='id', data=['LOAD']),
@@ -101,8 +101,8 @@ def run_network_cache_test(network_cache_factory: NetworkCacheFactory):
     pd.testing.assert_frame_equal(expected_loads, loads, check_dtype=False)
 
     # test generator modification
-    cache.update_generator_p('GEN', 310.0)
-    cache.update_generator_v('GEN', 25.0)
+    cache.update_generator_p(['GEN'], [310.0])
+    cache.update_generator_v(['GEN'], [25.0])
     cache.run_ac_pf()
     generators = cache.get_generators()
     expected_generators = pd.DataFrame(index=pd.Series(name='id', data=['GEN', 'GEN2']),

@@ -134,27 +134,27 @@ class NetworkCache(ABC):
         pass
 
     @abstractmethod
-    def update_load_p(self, iidm_id: str, new_p: float) -> None:
+    def update_load_p(self, iidm_id: List[str], new_p: List[float]) -> None:
         pass
 
     @abstractmethod
-    def update_load_q(self, iidm_id: str, new_q: float) -> None:
+    def update_load_q(self, iidm_id: List[str], new_q: List[float]) -> None:
         pass
 
     @abstractmethod
-    def update_generator_p(self, iidm_id: str, new_p: float) -> None:
+    def update_generator_p(self, iidm_id: List[str], new_p: List[float]) -> None:
         pass
 
     @abstractmethod
-    def update_generator_v(self, iidm_id: str, new_v: float) -> None:
+    def update_generator_v(self, iidm_id: List[str], new_v: List[float]) -> None:
         pass
 
     @abstractmethod
-    def update_shunt_p(self, iidm_id: str, new_p: float) -> None:
+    def update_shunt_p(self, iidm_id: List[str], new_p: List[float]) -> None:
         pass
 
     @abstractmethod
-    def update_shunt_q(self, iidm_id: str, new_q: float) -> None:
+    def update_shunt_q(self, iidm_id: List[str], new_q: List[float]) -> None:
         pass
 
     def convert_topo_to_bus_breaker(self):
