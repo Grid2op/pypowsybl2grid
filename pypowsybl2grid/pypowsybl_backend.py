@@ -233,7 +233,7 @@ class PyPowSyBlBackend(Backend):
                 self._network.disconnect_load(iidm_id)
             else:
                 new_bus_id = buses_dict[new_bus]
-                self._network.connected_load(iidm_id, new_bus_id)
+                self._network.connect_load(iidm_id, new_bus_id)
 
         # generators bus connection
         generators_bus = backend_action.get_gens_bus_global()
@@ -243,7 +243,7 @@ class PyPowSyBlBackend(Backend):
                 self._network.disconnect_generator(iidm_id)
             else:
                 new_bus_id = buses_dict[new_bus]
-                self._network.connected_generator(iidm_id, new_bus_id)
+                self._network.connect_generator(iidm_id, new_bus_id)
 
         # shunts bus connection
         shunts_bus = backend_action.get_shunts_bus_global()
@@ -253,7 +253,7 @@ class PyPowSyBlBackend(Backend):
                 self._network.disconnect_shunt(iidm_id)
             else:
                 new_bus_id = buses_dict[new_bus]
-                self._network.connected_shunt(iidm_id, new_bus_id)
+                self._network.connect_shunt(iidm_id, new_bus_id)
 
         # lines origin bus connection
         lines_or_bus = backend_action.get_lines_or_bus_global()

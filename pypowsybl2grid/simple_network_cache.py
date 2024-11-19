@@ -123,19 +123,19 @@ class SimpleNetworkCache(NetworkCache):
     def disconnect_load(self, iidm_id: str) -> None:
         self._network.update_loads(id=iidm_id, connected=False)
 
-    def connected_load(self, iidm_id: str, new_bus_id: str) -> None:
+    def connect_load(self, iidm_id: str, new_bus_id: str) -> None:
         self._network.update_loads(id=iidm_id, bus_breaker_bus_id=new_bus_id, connected=True)
 
     def disconnect_generator(self, iidm_id: str) -> None:
         self._network.update_generators(id=iidm_id, connected=False)
 
-    def connected_generator(self, iidm_id: str, new_bus_id: str) -> None:
+    def connect_generator(self, iidm_id: str, new_bus_id: str) -> None:
         self._network.update_generators(id=iidm_id, bus_breaker_bus_id=new_bus_id, connected=True)
 
     def disconnect_shunt(self, iidm_id: str) -> None:
         self._network.update_shunt_compensators(id=iidm_id, connected=False)
 
-    def connected_shunt(self, iidm_id: str, new_bus_id: str) -> None:
+    def connect_shunt(self, iidm_id: str, new_bus_id: str) -> None:
         self._network.update_shunt_compensators(id=iidm_id, bus_breaker_bus_id=new_bus_id, connected=True)
 
     def disconnect_branch_side1(self, iidm_id: str) -> None:

@@ -98,7 +98,7 @@ class NetworkCache(ABC):
         pass
 
     @abstractmethod
-    def connected_load(self, iidm_id: str, new_bus_id: str) -> None:
+    def connect_load(self, iidm_id: str, new_bus_id: str) -> None:
         pass
 
     @abstractmethod
@@ -106,7 +106,7 @@ class NetworkCache(ABC):
         pass
 
     @abstractmethod
-    def connected_generator(self, iidm_id: str, new_bus_id: str) -> None:
+    def connect_generator(self, iidm_id: str, new_bus_id: str) -> None:
         pass
 
     @abstractmethod
@@ -114,7 +114,7 @@ class NetworkCache(ABC):
         pass
 
     @abstractmethod
-    def connected_shunt(self, iidm_id: str, new_bus_id: str) -> None:
+    def connect_shunt(self, iidm_id: str, new_bus_id: str) -> None:
         pass
 
     @abstractmethod

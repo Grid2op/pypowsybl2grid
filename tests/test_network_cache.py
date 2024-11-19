@@ -123,7 +123,7 @@ def run_network_cache_test(network_cache_factory: NetworkCacheFactory):
     pd.testing.assert_frame_equal(expected_loads, loads, check_dtype=False)
 
     # load reconnection
-    cache.connected_load('LOAD', 'NLOAD')
+    cache.connect_load('LOAD', 'NLOAD')
     cache.run_ac_pf()
     loads = cache.get_loads()
     expected_loads = pd.DataFrame(index=pd.Series(name='id', data=['LOAD']),
