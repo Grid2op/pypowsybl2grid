@@ -230,50 +230,50 @@ class PyPowSyBlBackend(Backend):
         for load_id, new_bus in loads_bus:
             iidm_id = str(load_ids[load_id])
             if new_bus == -1:
-                self._network.disconnect_load(iidm_id)
+                self._network.connect_load(iidm_id, False, None)
             else:
                 new_bus_id = buses_dict[new_bus]
-                self._network.connect_load(iidm_id, new_bus_id)
+                self._network.connect_load(iidm_id, True, new_bus_id)
 
         # generators bus connection
         generators_bus = backend_action.get_gens_bus_global()
         for gen_id, new_bus in generators_bus:
             iidm_id = str(generator_ids[gen_id])
             if new_bus == -1:
-                self._network.disconnect_generator(iidm_id)
+                self._network.connect_generator(iidm_id, False, None)
             else:
                 new_bus_id = buses_dict[new_bus]
-                self._network.connect_generator(iidm_id, new_bus_id)
+                self._network.connect_generator(iidm_id, True, new_bus_id)
 
         # shunts bus connection
         shunts_bus = backend_action.get_shunts_bus_global()
         for shunt_id, new_bus in shunts_bus:
             iidm_id = str(shunt_ids[shunt_id])
             if new_bus == -1:
-                self._network.disconnect_shunt(iidm_id)
+                self._network.connect_shunt(iidm_id, False, None)
             else:
                 new_bus_id = buses_dict[new_bus]
-                self._network.connect_shunt(iidm_id, new_bus_id)
+                self._network.connect_shunt(iidm_id, True, new_bus_id)
 
         # lines origin bus connection
         lines_or_bus = backend_action.get_lines_or_bus_global()
         for line_id, new_bus in lines_or_bus:
             iidm_id = str(branch_ids[line_id])
             if new_bus == -1:
-                self._network.disconnect_branch_side1(iidm_id)
+                self._network.connect_branch_side1(iidm_id, False, None)
             else:
                 new_bus_id = buses_dict[new_bus]
-                self._network.connect_branch_side1(iidm_id, new_bus_id)
+                self._network.connect_branch_side1(iidm_id, True, new_bus_id)
 
         # lines extremity bus connection
         lines_ex_bus = backend_action.get_lines_ex_bus_global()
         for line_id, new_bus in lines_ex_bus:
             iidm_id = str(branch_ids[line_id])
             if new_bus == -1:
-                self._network.disconnect_branch_side2(iidm_id)
+                self._network.connect_branch_side2(iidm_id, False, None)
             else:
                 new_bus_id = buses_dict[new_bus]
-                self._network.connect_branch_side2(iidm_id, new_bus_id)
+                self._network.connect_branch_side2(iidm_id, True, new_bus_id)
 
         end_time = time.time()
         elapsed_time = (end_time - start_time) * 1000

@@ -94,43 +94,23 @@ class NetworkCache(ABC):
         pass
 
     @abstractmethod
-    def disconnect_load(self, iidm_id: str) -> None:
+    def connect_load(self, iidm_id: str, connected: bool, new_bus_id: Optional[str]) -> None:
         pass
 
     @abstractmethod
-    def connect_load(self, iidm_id: str, new_bus_id: str) -> None:
+    def connect_generator(self, iidm_id: str, connected: bool, new_bus_id: Optional[str]) -> None:
         pass
 
     @abstractmethod
-    def disconnect_generator(self, iidm_id: str) -> None:
+    def connect_shunt(self, iidm_id: str, connected: bool, new_bus_id: Optional[str]) -> None:
         pass
 
     @abstractmethod
-    def connect_generator(self, iidm_id: str, new_bus_id: str) -> None:
+    def connect_branch_side1(self, iidm_id: str, connected: bool, new_bus_id: Optional[str]) -> None:
         pass
 
     @abstractmethod
-    def disconnect_shunt(self, iidm_id: str) -> None:
-        pass
-
-    @abstractmethod
-    def connect_shunt(self, iidm_id: str, new_bus_id: str) -> None:
-        pass
-
-    @abstractmethod
-    def disconnect_branch_side1(self, iidm_id: str) -> None:
-        pass
-
-    @abstractmethod
-    def connect_branch_side1(self, iidm_id: str, new_bus_id: str) -> None:
-        pass
-
-    @abstractmethod
-    def disconnect_branch_side2(self, iidm_id: str) -> None:
-        pass
-
-    @abstractmethod
-    def connect_branch_side2(self, iidm_id: str, new_bus_id: str) -> None:
+    def connect_branch_side2(self, iidm_id: str, connected: bool, new_bus_id: Optional[str]) -> None:
         pass
 
     @abstractmethod

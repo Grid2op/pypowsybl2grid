@@ -265,12 +265,8 @@ class FastNetworkCache(NetworkCache):
     def _invalidate_loads_topo(self, iidm_id: str) -> None:
         self._loads_topo_to_update.append(iidm_id)
 
-    def disconnect_load(self, iidm_id: str) -> None:
-        self._network.update_loads(id=iidm_id, connected=False)
-        self._invalidate_loads_topo(iidm_id)
-
-    def connect_load(self, iidm_id: str, new_bus_id: str) -> None:
-        self._network.update_loads(id=iidm_id, bus_breaker_bus_id=new_bus_id, connected=True)
+    def connect_load(self, iidm_id: str, connected: bool, new_bus_id: Optional[str]) -> None:
+        self._network.update_loads(id=iidm_id, bus_breaker_bus_id=new_bus_id, connected=connected)
         self._invalidate_loads_topo(iidm_id)
 
     def _fetch_generator_topo(self) -> None:
@@ -286,12 +282,8 @@ class FastNetworkCache(NetworkCache):
     def _invalidate_generators_topo(self, iidm_id: str) -> None:
         self._generators_topo_to_update.append(iidm_id)
 
-    def disconnect_generator(self, iidm_id: str) -> None:
-        self._network.update_generators(id=iidm_id, connected=False)
-        self._invalidate_generators_topo(iidm_id)
-
-    def connect_generator(self, iidm_id: str, new_bus_id: str) -> None:
-        self._network.update_generators(id=iidm_id, bus_breaker_bus_id=new_bus_id, connected=True)
+    def connect_generator(self, iidm_id: str, connected: bool, new_bus_id: Optional[str]) -> None:
+        self._network.update_generators(id=iidm_id, bus_breaker_bus_id=new_bus_id, connected=connected)
         self._invalidate_generators_topo(iidm_id)
 
     def _fetch_shunt_topo(self) -> None:
@@ -307,12 +299,8 @@ class FastNetworkCache(NetworkCache):
     def _invalidate_shunts_topo(self, iidm_id: str) -> None:
         self._shunts_topo_to_update.append(iidm_id)
 
-    def disconnect_shunt(self, iidm_id: str) -> None:
-        self._network.update_shunt_compensators(id=iidm_id, connected=False)
-        self._invalidate_shunts_topo(iidm_id)
-
-    def connect_shunt(self, iidm_id: str, new_bus_id: str) -> None:
-        self._network.update_shunt_compensators(id=iidm_id, bus_breaker_bus_id=new_bus_id, connected=True)
+    def connect_shunt(self, iidm_id: str, connected: bool, new_bus_id: Optional[str]) -> None:
+        self._network.update_shunt_compensators(id=iidm_id, bus_breaker_bus_id=new_bus_id, connected=connected)
         self._invalidate_shunts_topo(iidm_id)
 
     def _fetch_bus_topo(self) -> None:
@@ -354,20 +342,12 @@ class FastNetworkCache(NetworkCache):
     def _invalidate_branches_topo(self, iidm_id: str) -> None:
         self._branches_topo_to_update.append(iidm_id)
 
-    def disconnect_branch_side1(self, iidm_id: str) -> None:
-        self._network.update_branches(id=iidm_id, connected1=False)
+    def connect_branch_side1(self, iidm_id: str, connected: bool, new_bus_id: Optional[str]) -> None:
+        self._network.update_branches(id=iidm_id, bus_breaker_bus1_id=new_bus_id, connected1=connected)
         self._invalidate_branches_topo(iidm_id)
 
-    def connect_branch_side1(self, iidm_id: str, new_bus_id: str) -> None:
-        self._network.update_branches(id=iidm_id, bus_breaker_bus1_id=new_bus_id, connected1=True)
-        self._invalidate_branches_topo(iidm_id)
-
-    def disconnect_branch_side2(self, iidm_id: str) -> None:
-        self._network.update_branches(id=iidm_id, connected2=False)
-        self._invalidate_branches_topo(iidm_id)
-
-    def connect_branch_side2(self, iidm_id: str, new_bus_id: str) -> None:
-        self._network.update_branches(id=iidm_id, bus_breaker_bus2_id=new_bus_id, connected2=True)
+    def connect_branch_side2(self, iidm_id: str, connected: bool, new_bus_id: Optional[str]) -> None:
+        self._network.update_branches(id=iidm_id, bus_breaker_bus2_id=new_bus_id, connected2=connected)
         self._invalidate_branches_topo(iidm_id)
 
     def update_load_p(self, iidm_id: List[str], new_p: List[float]) -> None:
