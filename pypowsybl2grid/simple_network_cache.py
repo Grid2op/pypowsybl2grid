@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: MPL-2.0
 
 import logging
-from typing import Dict, Any, Tuple, Optional
+from typing import Dict, Any, Tuple, Optional, List
 
 import pandas as pd
 import pypowsybl as pp
@@ -31,6 +31,18 @@ class SimpleNetworkCache(NetworkCache):
         voltage_levels = self._network.get_voltage_levels(attributes=NetworkCache.VOLTAGE_LEVEL_ATTRIBUTES)
         voltage_levels['num'] = range(len(voltage_levels))  # add numbering
         return voltage_levels
+
+    def get_load_ids(self) -> List[str]:
+        return self._network.get_loads(attributes=[]).index.tolist()
+
+    def get_generator_ids(self) -> List[str]:
+        return self._network.get_generators(attributes=[]).index.tolist()
+
+    def get_shunt_ids(self) -> List[str]:
+        return self._network.get_shunt_compensators(attributes=[]).index.tolist()
+
+    def get_branch_ids(self) -> List[str]:
+        return self._network.get_branches(attributes=[]).index.tolist()
 
     def get_buses(self) -> Tuple[pd.DataFrame, Dict[int, str]]:
         buses = self._network.get_bus_breaker_view_buses(attributes=NetworkCache.BUS_ATTRIBUTES)

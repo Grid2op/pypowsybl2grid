@@ -181,6 +181,18 @@ class FastNetworkCache(NetworkCache):
         logger.info("Reset all retained switches")
         self._network.update_switches(id=self._switches.index, retained=[False] * len(self._switches))
 
+    def get_load_ids(self) -> List[str]:
+        return self._loads.index.tolist()
+
+    def get_generator_ids(self) -> List[str]:
+        return self._generators.index.tolist()
+
+    def get_shunt_ids(self) -> List[str]:
+        return self._shunts.index.tolist()
+
+    def get_branch_ids(self) -> List[str]:
+        return self._branches.index.tolist()
+
     def get_voltage_levels(self) -> pd.DataFrame:
         return self._voltage_levels
 

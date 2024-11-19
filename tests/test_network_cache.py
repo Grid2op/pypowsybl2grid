@@ -82,6 +82,12 @@ def run_network_cache_test(network_cache_factory: NetworkCacheFactory):
                                              ['', 'VLHV2', 'VLLOAD', 'NHV2', 'NLOAD', True, True, 600.867790, 274.376987, 977.985596,   -600.0,      -200.0,      2474.263394, 3, 389.952653, 0, 2, 147.578618, 0, 3]])
     pd.testing.assert_frame_equal(expected_branches, branches, check_dtype=False)
 
+    # test IDs
+    assert ['LOAD'] == cache.get_load_ids()
+    assert ['GEN', 'GEN2'] == cache.get_generator_ids()
+    assert [] == cache.get_shunt_ids()
+    assert ['NHV1_NHV2_1', 'NHV1_NHV2_2', 'NGEN_NHV1', 'NHV2_NLOAD'] == cache.get_branch_ids()
+
     # test load modification
     cache.update_load_p('LOAD', 700.0)
     cache.update_load_q('LOAD', 300.0)

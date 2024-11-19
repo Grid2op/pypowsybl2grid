@@ -32,6 +32,22 @@ class NetworkCache(ABC):
         return self._network.id
 
     @abstractmethod
+    def get_load_ids(self) -> List[str]:
+        pass
+
+    @abstractmethod
+    def get_generator_ids(self) -> List[str]:
+        pass
+
+    @abstractmethod
+    def get_shunt_ids(self) -> List[str]:
+        pass
+
+    @abstractmethod
+    def get_branch_ids(self) -> List[str]:
+        pass
+
+    @abstractmethod
     def get_voltage_levels(self) -> pd.DataFrame:
         pass
 
