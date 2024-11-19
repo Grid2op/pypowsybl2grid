@@ -276,6 +276,10 @@ class PyPowSyBlBackend(Backend):
         return result.status == pp.loadflow.ComponentStatus.CONVERGED or result.status == pp.loadflow.ComponentStatus.NO_CALCULATION
 
     def runpf(self, is_dc: bool = False) -> Tuple[bool, Union[Exception, None]]:
+        logger.info("Running powerflow")
+
+        start_time = time.time()
+
         if self._check_isolated_and_disconnected_injections and self._check_isolated_injections():
             converged = False
         else:
@@ -284,6 +288,10 @@ class PyPowSyBlBackend(Backend):
             else:
                 results = self._network.run_ac_pf()
             converged = self._is_converged(results[0])
+
+        end_time = time.time()
+        elapsed_time = (end_time - start_time) * 1000
+        logger.info(f"Powerflow ran in {elapsed_time:.2f} ms")
 
         return converged, None if converged else DivergingPowerflow()  # FIXME this unusual as an API to require passing an exception as a return type
 
