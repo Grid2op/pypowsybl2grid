@@ -94,23 +94,23 @@ class NetworkCache(ABC):
         pass
 
     @abstractmethod
-    def connect_load(self, iidm_id: str, connected: bool, new_bus_id: Optional[str]) -> None:
+    def connect_load(self, iidm_id: List[str], connected: List[bool], new_bus_id: List[str]) -> None:
         pass
 
     @abstractmethod
-    def connect_generator(self, iidm_id: str, connected: bool, new_bus_id: Optional[str]) -> None:
+    def connect_generator(self, iidm_id: List[str], connected: List[bool], new_bus_id: List[str]) -> None:
         pass
 
     @abstractmethod
-    def connect_shunt(self, iidm_id: str, connected: bool, new_bus_id: Optional[str]) -> None:
+    def connect_shunt(self, iidm_id: List[str], connected: List[bool], new_bus_id: List[str]) -> None:
         pass
 
     @abstractmethod
-    def connect_branch_side1(self, iidm_id: str, connected: bool, new_bus_id: Optional[str]) -> None:
+    def connect_branch_side1(self, iidm_id: List[str], connected: List[bool], new_bus_id: List[str]) -> None:
         pass
 
     @abstractmethod
-    def connect_branch_side2(self, iidm_id: str, connected: bool, new_bus_id: Optional[str]) -> None:
+    def connect_branch_side2(self, iidm_id: List[str], connected: List[bool], new_bus_id: List[str]) -> None:
         pass
 
     @abstractmethod

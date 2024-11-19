@@ -120,19 +120,19 @@ class SimpleNetworkCache(NetworkCache):
     def create_buses(self, df: Optional[DataFrame] = None, **kwargs: Dict[str, Any]) -> None:
         self._network.create_buses(df, **kwargs)
 
-    def connect_load(self, iidm_id: str, connected: bool, new_bus_id: Optional[str]) -> None:
+    def connect_load(self, iidm_id: List[str], connected: List[bool], new_bus_id: List[str]) -> None:
         self._network.update_loads(id=iidm_id, bus_breaker_bus_id=new_bus_id, connected=connected)
 
-    def connect_generator(self, iidm_id: str, connected: bool, new_bus_id: Optional[str]) -> None:
+    def connect_generator(self, iidm_id: List[str], connected: List[bool], new_bus_id: List[str]) -> None:
         self._network.update_generators(id=iidm_id, bus_breaker_bus_id=new_bus_id, connected=connected)
 
-    def connect_shunt(self, iidm_id: str, connected: bool, new_bus_id: Optional[str]) -> None:
+    def connect_shunt(self, iidm_id: List[str], connected: List[bool], new_bus_id: List[str]) -> None:
         self._network.update_shunt_compensators(id=iidm_id, bus_breaker_bus_id=new_bus_id, connected=connected)
 
-    def connect_branch_side1(self, iidm_id: str, connected: bool, new_bus_id: Optional[str]) -> None:
+    def connect_branch_side1(self, iidm_id: List[str], connected: List[bool], new_bus_id: List[str]) -> None:
         self._network.update_branches(id=iidm_id, bus_breaker_bus1_id=new_bus_id, connected1=connected)
 
-    def connect_branch_side2(self, iidm_id: str, connected: bool, new_bus_id: Optional[str]) -> None:
+    def connect_branch_side2(self, iidm_id: List[str], connected: List[bool], new_bus_id: List[str]) -> None:
         self._network.update_branches(id=iidm_id, bus_breaker_bus2_id=new_bus_id, connected2=connected)
 
     def update_load_p(self, iidm_id: List[str], new_p: List[float]) -> None:

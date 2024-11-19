@@ -202,7 +202,7 @@ test = ["gym (>=0.26)", "gymnasium", "gymnasium", "gymnasium", "imageio", "image
 type = "git"
 url = "https://github.com/Grid2Op/grid2op.git"
 reference = "dev_1.11.0"
-resolved_reference = "14e0bdbfe5f28549390c1d2db12832cce703fc54"
+resolved_reference = "2b6a03e010d0757867389adf0a446568af2c58b9"
 
 [[package]]
 name = "idna"
@@ -560,8 +560,8 @@ pandapower = ["pandapower (>=2.4.11)"]
 [package.source]
 type = "git"
 url = "https://github.com/powsybl/pypowsybl.git"
-reference = "update_topology_kind"
-resolved_reference = "435634c547163a8b502f8e011da021fa1c9bba4e"
+reference = "integration_pypowsybl2grid"
+resolved_reference = "acaf8fb73b97c9a71b257df159e869f95e362487"
 
 [[package]]
 name = "pytest"
@@ -780,4 +780,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "3c457fe63c01a766caa30b723339da967578b1a7aec893a2279815ae77b22c3d"
+content-hash = "4ef867526097ec67882c80f18fd19cafba3a91433b2d00d79aad89b4b82173d4"

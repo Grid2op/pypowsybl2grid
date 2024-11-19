@@ -226,54 +226,89 @@ class PyPowSyBlBackend(Backend):
         self._network.update_shunt_q(shunt_ids_to_update, shunt_q_to_update)
 
         # loads bus connection
+        load_ids_to_update.clear()
+        load_connect_to_update = []
+        load_new_bus_id_to_update = []
         loads_bus = backend_action.get_loads_bus_global()
         for load_id, new_bus in loads_bus:
             iidm_id = str(load_ids[load_id])
+            load_ids_to_update.append(iidm_id)
             if new_bus == -1:
-                self._network.connect_load(iidm_id, False, None)
+                load_connect_to_update.append(False)
+                load_new_bus_id_to_update.append('')
             else:
                 new_bus_id = buses_dict[new_bus]
-                self._network.connect_load(iidm_id, True, new_bus_id)
+                load_connect_to_update.append(True)
+                load_new_bus_id_to_update.append(new_bus_id)
+        self._network.connect_load(load_ids_to_update, load_connect_to_update, load_new_bus_id_to_update)
 
         # generators bus connection
+        gen_ids_to_update.clear()
+        gen_connect_to_update = []
+        gen_new_bus_id_to_update = []
         generators_bus = backend_action.get_gens_bus_global()
         for gen_id, new_bus in generators_bus:
             iidm_id = str(generator_ids[gen_id])
+            gen_ids_to_update.append(iidm_id)
             if new_bus == -1:
-                self._network.connect_generator(iidm_id, False, None)
+                gen_connect_to_update.append(False)
+                gen_new_bus_id_to_update.append('')
             else:
                 new_bus_id = buses_dict[new_bus]
-                self._network.connect_generator(iidm_id, True, new_bus_id)
+                gen_connect_to_update.append(True)
+                gen_new_bus_id_to_update.append(new_bus_id)
+        self._network.connect_generator(gen_ids_to_update, gen_connect_to_update, gen_new_bus_id_to_update)
 
         # shunts bus connection
+        shunt_ids_to_update.clear()
+        shunt_connect_to_update = []
+        shunt_new_bus_id_to_update = []
         shunts_bus = backend_action.get_shunts_bus_global()
         for shunt_id, new_bus in shunts_bus:
             iidm_id = str(shunt_ids[shunt_id])
+            shunt_ids_to_update.append(iidm_id)
             if new_bus == -1:
-                self._network.connect_shunt(iidm_id, False, None)
+                shunt_connect_to_update.append(False)
+                shunt_new_bus_id_to_update.append('')
             else:
                 new_bus_id = buses_dict[new_bus]
-                self._network.connect_shunt(iidm_id, True, new_bus_id)
+                shunt_connect_to_update.append(True)
+                shunt_new_bus_id_to_update.append(new_bus_id)
+        self._network.connect_shunt(shunt_ids_to_update, shunt_connect_to_update, shunt_new_bus_id_to_update)
 
         # lines origin bus connection
+        branch_ids_to_update = []
+        branch_connect_to_update = []
+        branch_new_bus_id_to_update = []
         lines_or_bus = backend_action.get_lines_or_bus_global()
         for line_id, new_bus in lines_or_bus:
             iidm_id = str(branch_ids[line_id])
+            branch_ids_to_update.append(iidm_id)
             if new_bus == -1:
-                self._network.connect_branch_side1(iidm_id, False, None)
+                branch_connect_to_update.append(False)
+                branch_new_bus_id_to_update.append('')
             else:
                 new_bus_id = buses_dict[new_bus]
-                self._network.connect_branch_side1(iidm_id, True, new_bus_id)
+                branch_connect_to_update.append(True)
+                branch_new_bus_id_to_update.append(new_bus_id)
+        self._network.connect_branch_side1(branch_ids_to_update, branch_connect_to_update, branch_new_bus_id_to_update)
 
         # lines extremity bus connection
+        branch_ids_to_update.clear()
+        branch_connect_to_update.clear()
+        branch_new_bus_id_to_update.clear()
         lines_ex_bus = backend_action.get_lines_ex_bus_global()
         for line_id, new_bus in lines_ex_bus:
             iidm_id = str(branch_ids[line_id])
+            branch_ids_to_update.append(iidm_id)
             if new_bus == -1:
-                self._network.connect_branch_side2(iidm_id, False, None)
+                branch_connect_to_update.append(False)
+                branch_new_bus_id_to_update.append('')
             else:
                 new_bus_id = buses_dict[new_bus]
-                self._network.connect_branch_side2(iidm_id, True, new_bus_id)
+                branch_connect_to_update.append(True)
+                branch_new_bus_id_to_update.append(new_bus_id)
+        self._network.connect_branch_side2(branch_ids_to_update, branch_connect_to_update, branch_new_bus_id_to_update)
 
         end_time = time.time()
         elapsed_time = (end_time - start_time) * 1000

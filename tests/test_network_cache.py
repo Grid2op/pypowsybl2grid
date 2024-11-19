@@ -113,7 +113,7 @@ def run_network_cache_test(network_cache_factory: NetworkCacheFactory):
     pd.testing.assert_frame_equal(expected_generators, generators, check_dtype=False)
 
     # load disconnection
-    cache.connect_load('LOAD', False, None)
+    cache.connect_load(['LOAD'], [False], [''])
     cache.run_ac_pf()
     loads = cache.get_loads()
     expected_loads = pd.DataFrame(index=pd.Series(name='id', data=['LOAD']),
@@ -123,7 +123,7 @@ def run_network_cache_test(network_cache_factory: NetworkCacheFactory):
     pd.testing.assert_frame_equal(expected_loads, loads, check_dtype=False)
 
     # load reconnection
-    cache.connect_load('LOAD', True, 'NLOAD')
+    cache.connect_load(['LOAD'], [True], ['NLOAD'])
     cache.run_ac_pf()
     loads = cache.get_loads()
     expected_loads = pd.DataFrame(index=pd.Series(name='id', data=['LOAD']),
@@ -133,8 +133,8 @@ def run_network_cache_test(network_cache_factory: NetworkCacheFactory):
     pd.testing.assert_frame_equal(expected_loads, loads, check_dtype=False)
 
     # line disconnection
-    cache.connect_branch_side1('NHV1_NHV2_1', False, None)
-    cache.connect_branch_side2('NHV1_NHV2_1', False, None)
+    cache.connect_branch_side1(['NHV1_NHV2_1'], [False], [''])
+    cache.connect_branch_side2(['NHV1_NHV2_1'], [False], [''])
     cache.run_ac_pf()
     branches = cache.get_branches()
     expected_branches = pd.DataFrame(
@@ -149,8 +149,8 @@ def run_network_cache_test(network_cache_factory: NetworkCacheFactory):
     pd.testing.assert_frame_equal(expected_branches, branches, check_dtype=False)
 
     # line reconnection
-    cache.connect_branch_side1('NHV1_NHV2_1', True, 'NHV1')
-    cache.connect_branch_side2('NHV1_NHV2_1', True, 'NHV2')
+    cache.connect_branch_side1(['NHV1_NHV2_1'], [True], ['NHV1'])
+    cache.connect_branch_side2(['NHV1_NHV2_1'], [True], ['NHV2'])
     cache.run_ac_pf()
     branches = cache.get_branches()
     expected_branches = pd.DataFrame(
