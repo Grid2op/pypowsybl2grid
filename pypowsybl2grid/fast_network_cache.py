@@ -28,7 +28,6 @@ class FastNetworkCache(NetworkCache):
     def __init__(self, network: pp.network.Network, lf_parameters: pp.loadflow.Parameters):
         super().__init__(network, lf_parameters)
         # everything is up-to-date
-        self._buses_topo_to_update = False
         self._loads_topo_to_update = []
         self._generators_topo_to_update = []
         self._shunts_topo_to_update = []
@@ -253,7 +252,6 @@ class FastNetworkCache(NetworkCache):
 
     def _invalidate_loads_topo(self, iidm_id: str) -> None:
         self._loads_topo_to_update.append(iidm_id)
-        self._buses_topo_to_update = True
 
     def disconnect_load(self, iidm_id: str) -> None:
         self._network.update_loads(id=iidm_id, connected=False)
@@ -275,7 +273,6 @@ class FastNetworkCache(NetworkCache):
 
     def _invalidate_generators_topo(self, iidm_id: str) -> None:
         self._generators_topo_to_update.append(iidm_id)
-        self._buses_topo_to_update = True
 
     def disconnect_generator(self, iidm_id: str) -> None:
         self._network.update_generators(id=iidm_id, connected=False)
@@ -297,7 +294,6 @@ class FastNetworkCache(NetworkCache):
 
     def _invalidate_shunts_topo(self, iidm_id: str) -> None:
         self._shunts_topo_to_update.append(iidm_id)
-        self._buses_topo_to_update = True
 
     def disconnect_shunt(self, iidm_id: str) -> None:
         self._network.update_shunt_compensators(id=iidm_id, connected=False)
@@ -308,10 +304,8 @@ class FastNetworkCache(NetworkCache):
         self._invalidate_shunts_topo(iidm_id)
 
     def _fetch_bus_topo(self) -> None:
-        if self._buses_topo_to_update:
-            buses_topo_update = self._network.get_bus_breaker_view_buses(attributes=FastNetworkCache.BUS_TOPO_ATTRIBUTES)
-            FastNetworkCache._update(self._buses, buses_topo_update)
-            self._buses_topo_to_update = False
+        buses_topo_update = self._network.get_bus_breaker_view_buses(attributes=FastNetworkCache.BUS_TOPO_ATTRIBUTES)
+        FastNetworkCache._update(self._buses, buses_topo_update)
 
     def _fetch_branch_topo(self) -> None:
         if len(self._branches_topo_to_update) == 0:
@@ -347,7 +341,6 @@ class FastNetworkCache(NetworkCache):
 
     def _invalidate_branches_topo(self, iidm_id: str) -> None:
         self._branches_topo_to_update.append(iidm_id)
-        self._buses_topo_to_update = True
 
     def disconnect_branch_side1(self, iidm_id: str) -> None:
         self._network.update_branches(id=iidm_id, connected1=False)
