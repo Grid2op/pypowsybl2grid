@@ -6,6 +6,7 @@
 
 import logging
 import os
+import time
 from typing import Optional, Tuple, Union
 
 import grid2op
@@ -50,6 +51,10 @@ class PyPowSyBlBackend(Backend):
     def load_grid(self,
                   path: Union[os.PathLike, str],
                   filename: Optional[Union[os.PathLike, str]] = None) -> None:
+        logger.info("Loading network")
+
+        start_time = time.time()
+
         # load network
         full_path = self.make_complete_path(path, filename)
 
@@ -148,17 +153,28 @@ class PyPowSyBlBackend(Backend):
             self.thermal_limit_a[row.num] = row.value
 
         switches = self._network.get_switches()
-        logger.info(f"Network '{self._network.get_id()}' loaded with {len(switches)} retained switches: {len(buses)} buses, {len(branches)} branches, {len(generators)} generators, {len(loads)} loads, {len(shunts)} shunts")
+
+        end_time = time.time()
+        elapsed_time = (end_time - start_time) * 1000
+        logger.info(f"Network '{self._network.get_id()}' loaded in {elapsed_time:.2f} ms with {len(switches)} retained switches: {len(buses)} buses, "
+                    f"{len(branches)} branches, {len(generators)} generators, {len(loads)} loads, {len(shunts)} shunts")
 
     def apply_action(self, backend_action: Union["grid2op.Action._backendAction._BackendAction", None]) -> None:
         # the following few lines are highly recommended
         if backend_action is None:
             return
 
-        logger.info("Apply action")
+        logger.info("Applying action")
+
+        start_time = time.time()
+
+        _, buses_dict = self._network.get_buses()
+        loads = self._network.get_loads()
+        generators = self._network.get_generators()
+        shunts = self._network.get_shunts()
+        branches = self._network.get_branches()
 
         # active and reactive power of loads
-        loads = self._network.get_loads()
         for load_id, new_p in backend_action.load_p:
             iidm_id = str(loads.iloc[load_id].name)
             self._network.update_load_p(iidm_id, new_p)
@@ -168,7 +184,6 @@ class PyPowSyBlBackend(Backend):
             self._network.update_load_q(iidm_id, new_q)
 
         # active power and voltage target of generators
-        generators = self._network.get_generators()
         for gen_id, new_p in backend_action.prod_p:
             iidm_id = str(generators.iloc[gen_id].name)
             self._network.update_generator_p(iidm_id, new_p)
@@ -178,7 +193,6 @@ class PyPowSyBlBackend(Backend):
             self._network.update_generator_v(iidm_id, new_v)
 
         # active and reactive power of shunts
-        shunts = self._network.get_shunts()
         for shunt_id, new_p in backend_action.shunt_p:
             iidm_id = str(shunts.iloc[shunt_id].name)
             self._network.update_shunt_p(iidm_id, new_p)
@@ -188,7 +202,6 @@ class PyPowSyBlBackend(Backend):
             self._network.update_shunt_q(iidm_id, new_q)
 
         # loads bus connection
-        _, buses_dict = self._network.get_buses()
         loads_bus = backend_action.get_loads_bus_global()
         for load_id, new_bus in loads_bus:
             iidm_id = str(loads.iloc[load_id].name)
@@ -219,7 +232,6 @@ class PyPowSyBlBackend(Backend):
                 self._network.connected_shunt(iidm_id, new_bus_id)
 
         # lines origin bus connection
-        branches = self._network.get_branches()
         lines_or_bus = backend_action.get_lines_or_bus_global()
         for line_id, new_bus in lines_or_bus:
             iidm_id = str(branches.iloc[line_id].name)
@@ -238,6 +250,10 @@ class PyPowSyBlBackend(Backend):
             else:
                 new_bus_id = buses_dict[new_bus]
                 self._network.connect_branch_side2(iidm_id, new_bus_id)
+
+        end_time = time.time()
+        elapsed_time = (end_time - start_time) * 1000
+        logger.info(f"Action applied in {elapsed_time:.2f} ms")
 
     def _check_isolated_injections(self) -> bool:
         loads = self._network.get_loads()
@@ -331,3 +347,9 @@ class PyPowSyBlBackend(Backend):
 
     def lines_ex_info(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         return self._lines_info('p2', 'q2', 'i2', 'v_mag_bus2', 'connected2')
+
+    def reset(self,
+              path : Union[os.PathLike, str],
+              grid_filename : Optional[Union[os.PathLike, str]]=None) -> None:
+        logger.info("Reset backend")
+        self.load_grid(path, filename=grid_filename)
