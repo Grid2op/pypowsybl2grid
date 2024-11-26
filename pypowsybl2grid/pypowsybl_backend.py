@@ -32,6 +32,7 @@ class PyPowSyBlBackend(Backend):
                  check_isolated_and_disconnected_injections = True,
                  consider_open_branch_reactive_flow = False,
                  n_busbar_per_sub = DEFAULT_N_BUSBAR_PER_SUB,
+                 connect_all_elements_to_first_bus = True,
                  lf_parameters: pp.loadflow.Parameters = DEFAULT_LF_PARAMETERS):
         Backend.__init__(self,
                          detailed_infos_for_cascading_failures=detailed_infos_for_cascading_failures,
@@ -39,6 +40,7 @@ class PyPowSyBlBackend(Backend):
         self._check_isolated_and_disconnected_injections = check_isolated_and_disconnected_injections
         self._consider_open_branch_reactive_flow = consider_open_branch_reactive_flow
         self.n_busbar_per_sub = n_busbar_per_sub
+        self._connect_all_elements_to_first_bus = connect_all_elements_to_first_bus
         self._lf_parameters = lf_parameters
 
         self.shunts_data_available = True
@@ -73,6 +75,8 @@ class PyPowSyBlBackend(Backend):
         # FIXME waiting for being able to use switch actions with the backend in case of node/breaker voltage levels
         # for now we convert all voltage level to bus/breaker ones
         self._network.convert_topo_to_bus_breaker()
+        if self._connect_all_elements_to_first_bus:
+            self._network.connect_all_elements_to_first_bus()
 
         # only one value for n_busbar_per_sub is allowed => use maximum one across all voltage levels
         buses, _ = self._network.get_buses()

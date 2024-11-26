@@ -142,6 +142,41 @@ class NetworkCache(ABC):
         node_breaker_voltage_levels = voltage_levels[voltage_levels['topology_kind'] == 'NODE_BREAKER']
         self._network.update_voltage_levels(id=node_breaker_voltage_levels.index, topology_kind=['BUS_BREAKER'] * len(node_breaker_voltage_levels))
 
+    @staticmethod
+    def _injection_new_bus_breaker_bus_id(injections: DataFrame, first_bus_by_voltage_level: DataFrame) -> List[str]:
+        return injections.merge(first_bus_by_voltage_level, on='voltage_level_id', how='left', suffixes=('', '_new'))['bus_breaker_bus_id_new'].to_list()
+
+    @staticmethod
+    def _branches_new_bus_breaker_bus_id(branches: DataFrame, first_bus_by_voltage_level: DataFrame) -> Tuple[List[str], List[str]]:
+        branches_tmp = branches.merge(first_bus_by_voltage_level, left_on='voltage_level1_id', right_on='voltage_level_id', how='left', suffixes=('', '_new1'))
+        branches_tmp = branches_tmp.merge(first_bus_by_voltage_level, left_on='voltage_level2_id', right_on='voltage_level_id', how='left', suffixes=('', '_new2'))
+        return branches_tmp['bus_breaker_bus_id'].to_list(), branches_tmp['bus_breaker_bus_id_new2'].to_list()
+
+    def connect_all_elements_to_first_bus(self):
+        buses = self.get_buses()[0]
+        first_bus_by_voltage_level = buses.drop_duplicates(subset=['voltage_level_id'], keep='first')
+        first_bus_by_voltage_level = first_bus_by_voltage_level[['voltage_level_id']]
+        first_bus_by_voltage_level.reset_index(inplace=True)
+        first_bus_by_voltage_level = first_bus_by_voltage_level.set_index('voltage_level_id')
+        first_bus_by_voltage_level.rename(columns={"id": "bus_breaker_bus_id"}, inplace=True)
+
+        loads = self.get_loads()
+        load_new_bus_breaker_bus_id = self._injection_new_bus_breaker_bus_id(loads, first_bus_by_voltage_level)
+        self._network.update_loads(id=loads.index, bus_breaker_bus_id=load_new_bus_breaker_bus_id)
+
+        gens = self.get_generators()
+        gen_new_bus_breaker_bus_id = self._injection_new_bus_breaker_bus_id(gens, first_bus_by_voltage_level)
+        self._network.update_generators(id=gens.index, bus_breaker_bus_id=gen_new_bus_breaker_bus_id)
+
+        shunts = self.get_shunts()
+        shunts_new_bus_breaker_bus_id = self._injection_new_bus_breaker_bus_id(shunts, first_bus_by_voltage_level)
+        self._network.update_shunt_compensators(id=shunts.index, bus_breaker_bus_id=shunts_new_bus_breaker_bus_id)
+
+        branches = self.get_branches()
+        branches_new_bus_breaker_bus1_id, branches_new_bus_breaker_bus2_id = self._branches_new_bus_breaker_bus_id(branches, first_bus_by_voltage_level)
+        self._network.update_branches(id=branches.index, bus_breaker_bus1_id=branches_new_bus_breaker_bus1_id, bus_breaker_bus2_id=branches_new_bus_breaker_bus2_id)
+
+
 class NetworkCacheFactory(ABC):
 
     @abstractmethod
