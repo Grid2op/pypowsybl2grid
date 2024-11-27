@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Install Ubuntu packages
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo apt update
+          sudo apt -y install maven python3.9 python3.9-dev python3.9-venv pipx
+          pipx install poetry
+
+      - name: Setup GraalVM
+        uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: '17'
+          distribution: 'graalvm'
+
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      # --> to remove when we will be able to a pypowsybl official release
+      - name: Checkout PowSyBl core snapshot sources
+        uses: actions/checkout@v4
+        with:
+          repository: powsybl/powsybl-core
+          ref: topology_model_conversion
+          path: powsybl-core
+
+      - name: Build and install PowSyBl core snapshot
+        run: mvn --batch-mode -DskipTests=true --file powsybl-core/pom.xml install
+      # <--
+
+      - name: Install dependencies
+        run: poetry install
+
+      - name: Build wheel
+        run: poetry build
+
+      - name: Run tests
+        run: poetry run pytest
+
+      - name: Copy PyPowSyBl wheel
+        run: cp $(find $HOME/.cache/pypoetry/artifacts/ -name pypowsybl*.whl) dist/
+
+      - name: Upload wheel
+        uses: actions/upload-artifact@v4
+        with:
+          name: pypowsybl2grid-wheels
+          path: dist/*.whl
