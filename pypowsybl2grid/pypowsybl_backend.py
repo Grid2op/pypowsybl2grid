@@ -44,7 +44,7 @@ class PyPowSyBlBackend(Backend):
         self._lf_parameters = lf_parameters
 
         self.shunts_data_available = True
-        self.supported_grid_format = ("json", "xiidm", "txt")  # FIXME dynamically get supported extensions
+        self.supported_grid_format = pp.network.get_import_supported_extensions()
 
     @staticmethod
     def create_name(df: DataFrame) -> np.ndarray:
