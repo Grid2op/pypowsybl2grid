@@ -5,3 +5,4 @@
 # SPDX-License-Identifier: MPL-2.0
 
 from .pypowsybl_backend import PyPowSyBlBackend
+from .util import write_obs_json
