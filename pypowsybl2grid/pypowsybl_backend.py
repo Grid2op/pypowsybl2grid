@@ -12,16 +12,11 @@ from typing import Optional, Tuple, Union
 import grid2op
 import numpy as np
 import pandapower as pdp
-import pandas as pd
 import pypowsybl as pp
 import pypowsybl.grid2op
 from grid2op.Backend import Backend
 from grid2op.Exceptions import DivergingPowerflow
 from grid2op.Space import DEFAULT_N_BUSBAR_PER_SUB
-from pandas import DataFrame
-
-from pypowsybl2grid.fast_network_cache import FastNetworkCache
-from pypowsybl2grid.network_cache import DEFAULT_LF_PARAMETERS
 
 logger = logging.getLogger(__name__)
 
@@ -49,10 +44,6 @@ class PyPowSyBlBackend(Backend):
         self.shunts_data_available = True
         self.supported_grid_format = pp.network.get_import_supported_extensions()
 
-    @staticmethod
-    def create_name(df: DataFrame) -> np.ndarray:
-        return np.where(df['name'].eq(''), df.index.to_series(), df['name'])
-
     def load_grid(self,
                   path: Union[os.PathLike, str],
                   filename: Optional[Union[os.PathLike, str]] = None) -> None:
@@ -68,7 +59,6 @@ class PyPowSyBlBackend(Backend):
             n = pp.network.convert_from_pandapower(n_pdp)
         else:
             n = pp.network.load(full_path)
-        self._network = FastNetworkCache(n, self._lf_parameters)
 
         self._native_backend = pp.grid2op.Backend(n,
                                                   self._consider_open_branch_reactive_flow,
