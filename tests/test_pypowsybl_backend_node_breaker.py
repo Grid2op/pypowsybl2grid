@@ -68,6 +68,7 @@ def test_backend_with_node_breaker_network():
     npt.assert_allclose(np.array([-10.531, -12.468, 0.468]), p_ex, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([-3.984, -5.015, 0.015]), q_ex, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([402.773, 402.775, 402.775]), v_ex, rtol=TOLERANCE, atol=TOLERANCE)
+    assert [1, 1, 1, 1, 1, 1, 1, 1, 1, 1] == backend.get_topo_vect().tolist()
 
     # disconnect line 12
     line12_num = 0
@@ -88,6 +89,10 @@ def test_backend_with_node_breaker_network():
     npt.assert_allclose(np.array([0.0, -23.001,  11.001]), p_ex, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([0.0, -9.019,  4.019]), q_ex, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([0.0, 402.594, 402.594]), v_ex, rtol=TOLERANCE, atol=TOLERANCE)
+    topo_vect = backend.get_topo_vect()
+    assert topo_vect[backend.line_or_pos_topo_vect[line12_num]] == -1
+    assert topo_vect[backend.line_ex_pos_topo_vect[line12_num]] == -1
+    assert [1, 1, -1, 1, 1, 1, -1, 1, 1, 1] == topo_vect.tolist()
 
     # reconnect line 12
     apply_action(backend, {"set_line_status": [(line12_num, 1)]})
@@ -104,6 +109,7 @@ def test_backend_with_node_breaker_network():
     npt.assert_allclose(np.array([-10.531, -12.468, 0.468]), p_ex, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([-3.984, -5.015, 0.015]), q_ex, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([402.773, 402.775, 402.775]), v_ex, rtol=TOLERANCE, atol=TOLERANCE)
+    assert [1, 1, 1, 1, 1, 1, 1, 1, 1, 1] == backend.get_topo_vect().tolist()
 
     # connect line 13 to bbs 1 of VL1 instead of bss2
     assert ['VL1', 'VL2', 'VL3'] == backend.name_sub.tolist()
@@ -121,6 +127,7 @@ def test_backend_with_node_breaker_network():
     npt.assert_allclose(np.array([0.0, -23.001,  11.001]), p_ex, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([0.0, -9.019,  4.019]), q_ex, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([402.324, 402.594, 402.594]), v_ex, rtol=TOLERANCE, atol=TOLERANCE)
+    assert [1, 1, 2, 1, 1, 1, 1, 1, 1, 1] == backend.get_topo_vect().tolist()
 
 
 def test_backend_with_node_breaker_network_and_an_initial_topo():
