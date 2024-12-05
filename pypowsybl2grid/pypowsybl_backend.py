@@ -12,17 +12,15 @@ from typing import Optional, Tuple, Union
 import grid2op
 import numpy as np
 import pandapower as pdp
-import pandas as pd
 import pypowsybl as pp
+import pypowsybl.grid2op
 from grid2op.Backend import Backend
-from grid2op.Exceptions import DivergingPowerflow, BackendError
+from grid2op.Exceptions import DivergingPowerflow
 from grid2op.Space import DEFAULT_N_BUSBAR_PER_SUB
-from pandas import DataFrame
-
-from pypowsybl2grid.fast_network_cache import FastNetworkCache
-from pypowsybl2grid.network_cache import DEFAULT_LF_PARAMETERS
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_LF_PARAMETERS = pp.loadflow.Parameters(voltage_init_mode=pp.loadflow.VoltageInitMode.DC_VALUES)
 
 class PyPowSyBlBackend(Backend):
 
@@ -46,10 +44,6 @@ class PyPowSyBlBackend(Backend):
         self.shunts_data_available = True
         self.supported_grid_format = pp.network.get_import_supported_extensions()
 
-    @staticmethod
-    def create_name(df: DataFrame) -> np.ndarray:
-        return np.where(df['name'].eq(''), df.index.to_series(), df['name'])
-
     def load_grid(self,
                   path: Union[os.PathLike, str],
                   filename: Optional[Union[os.PathLike, str]] = None) -> None:
@@ -65,103 +59,57 @@ class PyPowSyBlBackend(Backend):
             n = pp.network.convert_from_pandapower(n_pdp)
         else:
             n = pp.network.load(full_path)
-        self._network = FastNetworkCache(n, self._lf_parameters)
+
+        self._native_backend = pp.grid2op.Backend(n,
+                                                  self._consider_open_branch_reactive_flow,
+                                                  self.n_busbar_per_sub,
+                                                  self._connect_all_elements_to_first_bus)
 
         # substations mapped to IIDM voltage levels
-        voltage_levels = self._network.get_voltage_levels()
-        self.n_sub = len(voltage_levels)
-        self.name_sub = self.create_name(voltage_levels)
-
-        # FIXME waiting for being able to use switch actions with the backend in case of node/breaker voltage levels
-        # for now we convert all voltage level to bus/breaker ones
-        self._network.convert_topo_to_bus_breaker()
-        if self._connect_all_elements_to_first_bus:
-            self._network.connect_all_elements_to_first_bus()
-
-        # only one value for n_busbar_per_sub is allowed => use maximum one across all voltage levels
-        buses, _ = self._network.get_buses()
-
-        max_bus_count = int(buses['local_num'].max()) + 1
-        if self.n_busbar_per_sub is None:
-            if max_bus_count < 1:
-                raise BackendError("Network does not have any bus, it is impossible to define a n_busbar_per_sub")
-            self.n_busbar_per_sub = max_bus_count
-        else:
-            if self.n_busbar_per_sub < max_bus_count:
-                raise BackendError(f"n_busbar_per_sub ({self.n_busbar_per_sub}) is lower than maximum number of bus ({max_bus_count}) of the network with the current topology")
-
-        # create additional buses so that each voltage level to reach max_bus_count
-        bus_count_by_voltage_level = buses.groupby('voltage_level_id')['local_num'].max().reset_index()
-        for _, row in bus_count_by_voltage_level.iterrows():
-            voltage_level_id = row['voltage_level_id']
-            bus_count = row['local_num'] + 1
-            bus_nums_to_create = range(bus_count, self.n_busbar_per_sub)
-            bus_ids = [f"{voltage_level_id}_extra_busbar_{i}" for i in bus_nums_to_create]
-            voltage_level_ids = [voltage_level_id] * len(bus_nums_to_create)
-            self._network.create_buses(id=bus_ids, voltage_level_id=voltage_level_ids)
+        self.name_sub = self._native_backend.get_string_value(pp.grid2op.StringValueType.VOLTAGE_LEVEL_NAME)
+        self.n_sub = len(self.name_sub)
 
         self.can_handle_more_than_2_busbar()
 
         logger.info(f"{self.n_busbar_per_sub} busbars per substation")
 
         # loads
-        loads = self._network.get_loads()
-        self.n_load = len(loads)
-        self.name_load = self.create_name(loads)
-        self.load_to_subid = np.zeros(self.n_load, dtype=int)
-        for _, row in loads.iterrows():
-            self.load_to_subid[row.num] = voltage_levels.loc[row.voltage_level_id, "num"]
+        self.name_load = self._native_backend.get_string_value(pp.grid2op.StringValueType.LOAD_NAME)
+        self.n_load = len(self.name_load)
+        self.load_to_subid = self._native_backend.get_integer_value(pp.grid2op.IntegerValueType.LOAD_VOLTAGE_LEVEL_NUM)
 
         # generators
-        generators = self._network.get_generators()
-        self.n_gen = len(generators)
-        self.name_gen = self.create_name(generators)
-        self.gen_to_subid = np.zeros(self.n_gen, dtype=int)
-        for _, row in generators.iterrows():
-            self.gen_to_subid[row.num] = voltage_levels.loc[row.voltage_level_id, "num"]
+        self.name_gen = self._native_backend.get_string_value(pp.grid2op.StringValueType.GENERATOR_NAME)
+        self.n_gen = len(self.name_gen)
+        self.gen_to_subid = self._native_backend.get_integer_value(pp.grid2op.IntegerValueType.GENERATOR_VOLTAGE_LEVEL_NUM)
 
         # shunts
-        shunts = self._network.get_shunts()
-        self.n_shunt = len(shunts)
-        self.name_shunt = self.create_name(shunts)
-        self.shunt_to_subid = np.zeros(self.n_shunt, dtype=int)
-        for _, row in shunts.iterrows():
-            self.shunt_to_subid[row.num] = voltage_levels.loc[row.voltage_level_id, "num"]
+        self.name_shunt = self._native_backend.get_string_value(pp.grid2op.StringValueType.SHUNT_NAME)
+        self.n_shunt = len(self.name_shunt)
+        self.shunt_to_subid = self._native_backend.get_integer_value(pp.grid2op.IntegerValueType.SHUNT_VOLTAGE_LEVEL_NUM)
 
         # batteries
         self.set_no_storage()
         # FIXME implement batteries
-        # batteries = self._network.get_batteries()
-        # self.n_storage = len(batteries)
-        # self.name_storage = np.array(batteries.index)
+        # self.name_storage = np.array(self._native_backend.get_string_value(pp.grid2op.StringValueType.BATTERY_NAME))
+        # self.n_storage = len(self.name_storage)
         # self.storage_type = np.full(self.n_storage, fill_value="???")
-        # self.storage_to_subid = np.zeros(self.n_storage, dtype=int)
-        # for index, row in batteries.iterrows():
-        #     self.storage_to_subid[row.num] = voltage_levels.loc[row.voltage_level_id, "num"]
+        # self.storage_to_subid = self._native_backend.get_integer_value(pp.grid2op.IntegerValueType.BATTERY_VOLTAGE_LEVEL_NUM).copy()
 
         # lines and transformers
-        branches = self._network.get_branches()
-        self.n_line = len(branches)
-        self.name_line = self.create_name(branches)
-        self.line_or_to_subid = np.zeros(self.n_line, dtype=int)
-        self.line_ex_to_subid = np.zeros(self.n_line, dtype=int)
-        for _, row in branches.iterrows():
-            self.line_or_to_subid[row.num] = voltage_levels.loc[row.voltage_level1_id, "num"]
-            self.line_ex_to_subid[row.num] = voltage_levels.loc[row.voltage_level2_id, "num"]
+        self.name_line = self._native_backend.get_string_value(pp.grid2op.StringValueType.BRANCH_NAME)
+        self.n_line = len(self.name_line)
+        self.line_or_to_subid = self._native_backend.get_integer_value(pp.grid2op.IntegerValueType.BRANCH_VOLTAGE_LEVEL_NUM_1)
+        self.line_ex_to_subid = self._native_backend.get_integer_value(pp.grid2op.IntegerValueType.BRANCH_VOLTAGE_LEVEL_NUM_2)
 
         self._compute_pos_big_topo()
 
         # thermal limits
-        self.thermal_limit_a = np.zeros(self.n_line, dtype=int)
-        for _, row in self._network.get_branches_with_limits().iterrows():
-            self.thermal_limit_a[row.num] = row.value
-
-        switches = self._network.get_switches()
+        self.thermal_limit_a = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.BRANCH_PERMANENT_LIMIT_A)
 
         end_time = time.time()
         elapsed_time = (end_time - start_time) * 1000
-        logger.info(f"Network '{self._network.get_id()}' loaded in {elapsed_time:.2f} ms with {len(switches)} retained switches: {len(buses)} buses, "
-                    f"{len(branches)} branches, {len(generators)} generators, {len(loads)} loads, {len(shunts)} shunts")
+        logger.info(f"Network '{n.id}' loaded in {elapsed_time:.2f} ms")
 
     def apply_action(self, backend_action: Union["grid2op.Action._backendAction._BackendAction", None]) -> None:
         # the following few lines are highly recommended
@@ -172,167 +120,26 @@ class PyPowSyBlBackend(Backend):
 
         start_time = time.time()
 
-        _, buses_dict = self._network.get_buses()
-        load_ids = self._network.get_load_ids()
-        generator_ids = self._network.get_generator_ids()
-        shunt_ids = self._network.get_shunt_ids()
-        branch_ids = self._network.get_branch_ids()
+        self._native_backend.update_double_value(pp.grid2op.UpdateDoubleValueType.UPDATE_LOAD_P, backend_action.load_p.values, backend_action.load_p.changed)
+        self._native_backend.update_double_value(pp.grid2op.UpdateDoubleValueType.UPDATE_LOAD_Q, backend_action.load_q.values, backend_action.load_q.changed)
+        self._native_backend.update_double_value(pp.grid2op.UpdateDoubleValueType.UPDATE_GENERATOR_P, backend_action.prod_p.values, backend_action.prod_p.changed)
+        self._native_backend.update_double_value(pp.grid2op.UpdateDoubleValueType.UPDATE_GENERATOR_V, backend_action.prod_v.values, backend_action.prod_v.changed)
+        # TODO shunts
 
-        # active and reactive power of loads
-        load_ids_to_update = []
-        load_p_to_update = []
-        for load_id, new_p in backend_action.load_p:
-            iidm_id = str(load_ids[load_id])
-            load_ids_to_update.append(iidm_id)
-            load_p_to_update.append(new_p)
-        self._network.update_load_p(load_ids_to_update, load_p_to_update)
-
-        load_ids_to_update.clear()
-        load_q_to_update = []
-        for load_id, new_q in backend_action.load_q:
-            iidm_id = str(load_ids[load_id])
-            load_ids_to_update.append(iidm_id)
-            load_q_to_update.append(new_q)
-        self._network.update_load_q(load_ids_to_update, load_q_to_update)
-
-        # active power and voltage target of generators
-        gen_ids_to_update = []
-        gen_p_to_update = []
-        for gen_id, new_p in backend_action.prod_p:
-            iidm_id = str(generator_ids[gen_id])
-            gen_ids_to_update.append(iidm_id)
-            gen_p_to_update.append(new_p)
-        self._network.update_generator_p(gen_ids_to_update, gen_p_to_update)
-
-        gen_ids_to_update.clear()
-        gen_v_to_update = []
-        for gen_id, new_v in backend_action.prod_v:
-            iidm_id = str(generator_ids[gen_id])
-            gen_ids_to_update.append(iidm_id)
-            gen_v_to_update.append(new_v)
-        self._network.update_generator_v(gen_ids_to_update, gen_v_to_update)
-
-        # active and reactive power of shunts
-        shunt_ids_to_update = []
-        shunt_p_to_update = []
-        for shunt_id, new_p in backend_action.shunt_p:
-            iidm_id = str(shunt_ids[shunt_id])
-            shunt_ids_to_update.append(iidm_id)
-            shunt_p_to_update.append(new_p)
-        self._network.update_shunt_p(shunt_ids_to_update, shunt_p_to_update)
-
-        shunt_ids_to_update.clear()
-        shunt_q_to_update = []
-        for shunt_id, new_q in backend_action.shunt_q:
-            iidm_id = str(shunt_ids[shunt_id])
-            shunt_ids_to_update.append(iidm_id)
-            shunt_q_to_update.append(new_q)
-        self._network.update_shunt_q(shunt_ids_to_update, shunt_q_to_update)
-
-        # loads bus connection
-        load_ids_to_update.clear()
-        load_connect_to_update = []
-        load_new_bus_id_to_update = []
-        loads_bus = backend_action.get_loads_bus_global()
-        for load_id, new_bus in loads_bus:
-            iidm_id = str(load_ids[load_id])
-            load_ids_to_update.append(iidm_id)
-            if new_bus == -1:
-                load_connect_to_update.append(False)
-                load_new_bus_id_to_update.append('')
-            else:
-                new_bus_id = buses_dict[new_bus]
-                load_connect_to_update.append(True)
-                load_new_bus_id_to_update.append(new_bus_id)
-        self._network.connect_load(load_ids_to_update, load_connect_to_update, load_new_bus_id_to_update)
-
-        # generators bus connection
-        gen_ids_to_update.clear()
-        gen_connect_to_update = []
-        gen_new_bus_id_to_update = []
-        generators_bus = backend_action.get_gens_bus_global()
-        for gen_id, new_bus in generators_bus:
-            iidm_id = str(generator_ids[gen_id])
-            gen_ids_to_update.append(iidm_id)
-            if new_bus == -1:
-                gen_connect_to_update.append(False)
-                gen_new_bus_id_to_update.append('')
-            else:
-                new_bus_id = buses_dict[new_bus]
-                gen_connect_to_update.append(True)
-                gen_new_bus_id_to_update.append(new_bus_id)
-        self._network.connect_generator(gen_ids_to_update, gen_connect_to_update, gen_new_bus_id_to_update)
-
-        # shunts bus connection
-        shunt_ids_to_update.clear()
-        shunt_connect_to_update = []
-        shunt_new_bus_id_to_update = []
-        shunts_bus = backend_action.get_shunts_bus_global()
-        for shunt_id, new_bus in shunts_bus:
-            iidm_id = str(shunt_ids[shunt_id])
-            shunt_ids_to_update.append(iidm_id)
-            if new_bus == -1:
-                shunt_connect_to_update.append(False)
-                shunt_new_bus_id_to_update.append('')
-            else:
-                new_bus_id = buses_dict[new_bus]
-                shunt_connect_to_update.append(True)
-                shunt_new_bus_id_to_update.append(new_bus_id)
-        self._network.connect_shunt(shunt_ids_to_update, shunt_connect_to_update, shunt_new_bus_id_to_update)
-
-        # lines origin bus connection
-        branch_ids_to_update = []
-        branch_connect_to_update = []
-        branch_new_bus_id_to_update = []
-        lines_or_bus = backend_action.get_lines_or_bus_global()
-        for line_id, new_bus in lines_or_bus:
-            iidm_id = str(branch_ids[line_id])
-            branch_ids_to_update.append(iidm_id)
-            if new_bus == -1:
-                branch_connect_to_update.append(False)
-                branch_new_bus_id_to_update.append('')
-            else:
-                new_bus_id = buses_dict[new_bus]
-                branch_connect_to_update.append(True)
-                branch_new_bus_id_to_update.append(new_bus_id)
-        self._network.connect_branch_side1(branch_ids_to_update, branch_connect_to_update, branch_new_bus_id_to_update)
-
-        # lines extremity bus connection
-        branch_ids_to_update.clear()
-        branch_connect_to_update.clear()
-        branch_new_bus_id_to_update.clear()
-        lines_ex_bus = backend_action.get_lines_ex_bus_global()
-        for line_id, new_bus in lines_ex_bus:
-            iidm_id = str(branch_ids[line_id])
-            branch_ids_to_update.append(iidm_id)
-            if new_bus == -1:
-                branch_connect_to_update.append(False)
-                branch_new_bus_id_to_update.append('')
-            else:
-                new_bus_id = buses_dict[new_bus]
-                branch_connect_to_update.append(True)
-                branch_new_bus_id_to_update.append(new_bus_id)
-        self._network.connect_branch_side2(branch_ids_to_update, branch_connect_to_update, branch_new_bus_id_to_update)
+        loads_bus = backend_action.get_loads_bus()
+        self._native_backend.update_integer_value(pp.grid2op.UpdateIntegerValueType.UPDATE_LOAD_BUS, loads_bus.values, loads_bus.changed)
+        generators_bus = backend_action.get_gens_bus()
+        self._native_backend.update_integer_value(pp.grid2op.UpdateIntegerValueType.UPDATE_GENERATOR_BUS, generators_bus.values, generators_bus.changed)
+        shunt_bus = backend_action.shunt_bus
+        self._native_backend.update_integer_value(pp.grid2op.UpdateIntegerValueType.UPDATE_SHUNT_BUS, shunt_bus.values, shunt_bus.changed)
+        lines_or_bus = backend_action.get_lines_or_bus()
+        self._native_backend.update_integer_value(pp.grid2op.UpdateIntegerValueType.UPDATE_BRANCH_BUS1, lines_or_bus.values, lines_or_bus.changed)
+        lines_ex_bus = backend_action.get_lines_ex_bus()
+        self._native_backend.update_integer_value(pp.grid2op.UpdateIntegerValueType.UPDATE_BRANCH_BUS2, lines_ex_bus.values, lines_ex_bus.changed)
 
         end_time = time.time()
         elapsed_time = (end_time - start_time) * 1000
         logger.info(f"Action applied in {elapsed_time:.2f} ms")
-
-    def _check_isolated_injections(self) -> bool:
-        loads = self._network.get_loads()
-        if (loads['synchronous_component_bus'] > 0).any():
-            return True
-        if (~loads['connected']).any():
-            return True
-        generators = self._network.get_generators()
-        if (generators['synchronous_component_bus'] > 0).any():
-            return True
-        if (~generators['connected']).any():
-            return True
-        shunts = self._network.get_shunts()
-        if (shunts['synchronous_component_bus'] > 0).any():
-            return True
-        return False
 
     @staticmethod
     def _is_converged(result: pp.loadflow.ComponentResult) -> bool:
@@ -343,84 +150,60 @@ class PyPowSyBlBackend(Backend):
 
         start_time = time.time()
 
-        if self._check_isolated_and_disconnected_injections and self._check_isolated_injections():
+        if self._check_isolated_and_disconnected_injections and self._native_backend.check_isolated_and_disconnected_injections():
             converged = False
         else:
-            if is_dc:
-                results = self._network.run_dc_pf()
-            else:
-                results = self._network.run_ac_pf()
+            results = self._native_backend.run_pf(is_dc, self._lf_parameters)
             converged = self._is_converged(results[0])
 
         end_time = time.time()
         elapsed_time = (end_time - start_time) * 1000
         logger.info(f"Powerflow ran in {elapsed_time:.2f} ms")
 
-        return converged, None if converged else DivergingPowerflow()  # FIXME this unusual as an API to require passing an exception as a return type
-
-    def _update_topo_vect(self, res, df: pd.DataFrame, pos_topo_vect, bus_breaker_bus_id_attr: str,
-                          connected_attr: str, num_bus_attr: str) -> None:
-        for _, row in df.iterrows():
-            my_pos_topo_vect = pos_topo_vect[row['num']]
-            if row[bus_breaker_bus_id_attr] and row[connected_attr]:
-                local_bus = self.global_bus_to_local_int(row[num_bus_attr], my_pos_topo_vect)
-            else:
-                local_bus = -1
-            res[my_pos_topo_vect] = local_bus
+        return converged, None if converged else DivergingPowerflow()
 
     def get_topo_vect(self) -> np.ndarray:
-        res = np.full(self.dim_topo, fill_value=-2, dtype=int)
-        self._update_topo_vect(res, self._network.get_loads(), self.load_pos_topo_vect, 'bus_breaker_bus_id',
-                               'connected', 'num_bus')
-        self._update_topo_vect(res, self._network.get_generators(), self.gen_pos_topo_vect, 'bus_breaker_bus_id',
-                               'connected', 'num_bus')
-        # FIXME why no shunt_pos_topo_vect ?
-        branches = self._network.get_branches()
-        self._update_topo_vect(res, branches, self.line_or_pos_topo_vect, 'bus_breaker_bus1_id', 'connected1',
-                               'num_bus1')
-        self._update_topo_vect(res, branches, self.line_ex_pos_topo_vect, 'bus_breaker_bus2_id', 'connected2',
-                               'num_bus2')
-        return res
-
-    def _injections_info(self, df: pd.DataFrame, sign: float) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        p = np.nan_to_num(np.where(df['connected'], df['p'], 0)) * sign
-        q = np.nan_to_num(np.where(df['connected'], df['q'], 0)) * sign
-        v = np.nan_to_num(np.array(np.where(df['connected'], df['v_mag_bus'], 0)))
-        bus = np.array(np.where(df['connected'], df['local_num_bus'] + 1, -1)) # local bus number should start at 1...
-        return p, q, v, bus
+        return self._native_backend.get_integer_value(pp.grid2op.IntegerValueType.TOPO_VECT)
 
     def generators_info(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        p, q, v, _ = self._injections_info(self._network.get_generators(), -1.0) # load convention expected
+        p = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.GENERATOR_P)
+        q = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.GENERATOR_Q)
+        v = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.GENERATOR_V)
         return p, q, v
 
     def loads_info(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        p, q, v, _ = self._injections_info(self._network.get_loads(), 1.0)
+        p = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.LOAD_P)
+        q = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.LOAD_Q)
+        v = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.LOAD_V)
         return p, q, v
 
     def shunt_info(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        return self._injections_info(self._network.get_shunts(), 1.0)
-
-    def _lines_info(self, p_attr: str, q_attr: str, a_attr: str, v_attr: str, connected_attr: str) -> Tuple[
-        np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        branches = self._network.get_branches()
-        p = np.nan_to_num(np.where(branches[connected_attr], branches[p_attr], 0))
-        if self._consider_open_branch_reactive_flow:
-            q = np.nan_to_num(branches[q_attr])
-            a = np.nan_to_num(branches[a_attr])
-        else:
-            q = np.nan_to_num(np.where(branches[connected_attr], branches[q_attr], 0))
-            a = np.nan_to_num(np.where(branches[connected_attr], branches[a_attr], 0))
-        v = np.nan_to_num(np.where(branches[connected_attr], branches[v_attr], 0))
-        return p, q, v, a
+        p = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.SHUNT_P)
+        q = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.SHUNT_Q)
+        v = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.SHUNT_V)
+        # TODO invert shunt q sign
+        bus = self._native_backend.get_integer_value(pp.grid2op.IntegerValueType.SHUNT_LOCAL_BUS)
+        return p, q, v, bus
 
     def lines_or_info(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        return self._lines_info('p1', 'q1', 'i1', 'v_mag_bus1', 'connected1')
+        p = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.BRANCH_P1)
+        q = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.BRANCH_Q1)
+        v = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.BRANCH_V1)
+        a = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.BRANCH_I1)
+        return p, q, v, a
 
     def lines_ex_info(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        return self._lines_info('p2', 'q2', 'i2', 'v_mag_bus2', 'connected2')
+        p = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.BRANCH_P2)
+        q = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.BRANCH_Q2)
+        v = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.BRANCH_V2)
+        a = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.BRANCH_I2)
+        return p, q, v, a
 
     def reset(self,
               path : Union[os.PathLike, str],
               grid_filename : Optional[Union[os.PathLike, str]]=None) -> None:
         logger.info("Reset backend")
         self.load_grid(path, filename=grid_filename)
+
+    def close(self) -> None:
+        self._native_backend.close()

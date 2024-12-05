@@ -14,8 +14,7 @@ import pypowsybl as pp
 import pytest
 from pypowsybl.network import Network
 
-from pypowsybl2grid.network_cache import DEFAULT_LF_PARAMETERS
-from pypowsybl2grid.pypowsybl_backend import PyPowSyBlBackend
+from pypowsybl2grid.pypowsybl_backend import PyPowSyBlBackend, DEFAULT_LF_PARAMETERS
 from tests.simple_node_breaker_network import create_simple_node_breaker_network
 
 TOLERANCE = 1e-3
@@ -62,17 +61,21 @@ def test_backend_with_node_breaker_network():
     p_or, q_or, v_or, _ = backend.lines_or_info()
     p_ex, q_ex, v_ex, _ = backend.lines_ex_info()
     assert ['LINE12', 'LINE13', 'LINE23'] == backend.name_line.tolist()
+    assert [1, 1, 1, 1, 1, 1, 1, 1, 1, 1] == backend.get_topo_vect().tolist()
     npt.assert_allclose(np.array([10.532, 12.469, -0.468]), p_or, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([4.0, 5.033, -0.015]), q_or, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([403.0, 403.0, 402.881]), v_or, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([-10.531, -12.468, 0.468]), p_ex, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([-3.984, -5.015, 0.015]), q_ex, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([402.773, 402.775, 402.775]), v_ex, rtol=TOLERANCE, atol=TOLERANCE)
-    assert [1, 1, 1, 1, 1, 1, 1, 1, 1, 1] == backend.get_topo_vect().tolist()
 
     # disconnect line 12
     line12_num = 0
     apply_action(backend, {"set_line_status": [(line12_num, -1)]})
+    topo_vect = backend.get_topo_vect()
+    assert topo_vect[backend.line_or_pos_topo_vect[line12_num]] == -1
+    assert topo_vect[backend.line_ex_pos_topo_vect[line12_num]] == -1
+    assert [1, 1, -1, 1, 1, 1, -1, 1, 1, 1] == topo_vect.tolist()
 
     conv, _ = backend.runpf()
     assert conv
@@ -85,13 +88,10 @@ def test_backend_with_node_breaker_network():
     npt.assert_allclose(np.array([0.0, -23.001,  11.001]), p_ex, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([0.0, -9.019,  4.019]), q_ex, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([0.0, 402.594, 402.594]), v_ex, rtol=TOLERANCE, atol=TOLERANCE)
-    topo_vect = backend.get_topo_vect()
-    assert topo_vect[backend.line_or_pos_topo_vect[line12_num]] == -1
-    assert topo_vect[backend.line_ex_pos_topo_vect[line12_num]] == -1
-    assert [1, 1, -1, 1, 1, 1, -1, 1, 1, 1] == topo_vect.tolist()
 
     # reconnect line 12
     apply_action(backend, {"set_line_status": [(line12_num, 1)]})
+    assert [1, 1, 1, 1, 1, 1, 1, 1, 1, 1] == backend.get_topo_vect().tolist()
 
     conv, _ = backend.runpf()
     assert conv
@@ -104,11 +104,11 @@ def test_backend_with_node_breaker_network():
     npt.assert_allclose(np.array([-10.531, -12.468, 0.468]), p_ex, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([-3.984, -5.015, 0.015]), q_ex, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([402.773, 402.775, 402.775]), v_ex, rtol=TOLERANCE, atol=TOLERANCE)
-    assert [1, 1, 1, 1, 1, 1, 1, 1, 1, 1] == backend.get_topo_vect().tolist()
 
     # connect line 13 to bbs 1 of VL1 instead of bss2
     assert ['VL1', 'VL2', 'VL3'] == backend.name_sub.tolist()
     apply_action(backend, {'set_bus': {'lines_or_id': {'LINE12': 2}}})
+    assert [1, 1, 2, 1, 1, 1, 1, 1, 1, 1] == backend.get_topo_vect().tolist()
 
     conv, _ = backend.runpf()
     assert conv
@@ -121,7 +121,6 @@ def test_backend_with_node_breaker_network():
     npt.assert_allclose(np.array([0.0, -23.001,  11.001]), p_ex, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([0.0, -9.019,  4.019]), q_ex, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([402.324, 402.594, 402.594]), v_ex, rtol=TOLERANCE, atol=TOLERANCE)
-    assert [1, 1, 2, 1, 1, 1, 1, 1, 1, 1] == backend.get_topo_vect().tolist()
 
 
 def test_backend_with_node_breaker_network_and_an_initial_topo():
