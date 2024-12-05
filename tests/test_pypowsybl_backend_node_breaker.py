@@ -28,6 +28,7 @@ def setup():
 def create_backend(lf_parameters: pp.loadflow.Parameters = DEFAULT_LF_PARAMETERS):
     return PyPowSyBlBackend(check_isolated_and_disconnected_injections=False,
                             consider_open_branch_reactive_flow=True,
+                            connect_all_elements_to_first_bus=False,
                             lf_parameters=lf_parameters)
 
 

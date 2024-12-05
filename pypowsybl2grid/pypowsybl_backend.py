@@ -26,7 +26,6 @@ class PyPowSyBlBackend(Backend):
 
     def __init__(self,
                  detailed_infos_for_cascading_failures=False,
-                 can_be_copied: bool = True,
                  check_isolated_and_disconnected_injections = True,
                  consider_open_branch_reactive_flow = False,
                  n_busbar_per_sub = DEFAULT_N_BUSBAR_PER_SUB,
@@ -34,7 +33,7 @@ class PyPowSyBlBackend(Backend):
                  lf_parameters: pp.loadflow.Parameters = DEFAULT_LF_PARAMETERS):
         Backend.__init__(self,
                          detailed_infos_for_cascading_failures=detailed_infos_for_cascading_failures,
-                         can_be_copied=can_be_copied)
+                         can_be_copied=False)
         self._check_isolated_and_disconnected_injections = check_isolated_and_disconnected_injections
         self._consider_open_branch_reactive_flow = consider_open_branch_reactive_flow
         self.n_busbar_per_sub = n_busbar_per_sub
@@ -141,22 +140,6 @@ class PyPowSyBlBackend(Backend):
         elapsed_time = (end_time - start_time) * 1000
         logger.info(f"Action applied in {elapsed_time:.2f} ms")
 
-    def _check_isolated_injections(self) -> bool:
-        loads = self._network.get_loads()
-        if (loads['synchronous_component_bus'] > 0).any():
-            return True
-        if (~loads['connected']).any():
-            return True
-        generators = self._network.get_generators()
-        if (generators['synchronous_component_bus'] > 0).any():
-            return True
-        if (~generators['connected']).any():
-            return True
-        shunts = self._network.get_shunts()
-        if (shunts['synchronous_component_bus'] > 0).any():
-            return True
-        return False
-
     @staticmethod
     def _is_converged(result: pp.loadflow.ComponentResult) -> bool:
         return result.status == pp.loadflow.ComponentStatus.CONVERGED or result.status == pp.loadflow.ComponentStatus.NO_CALCULATION
@@ -197,7 +180,6 @@ class PyPowSyBlBackend(Backend):
         p = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.SHUNT_P)
         q = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.SHUNT_Q)
         v = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.SHUNT_V)
-        # TODO invert shunt q sign
         bus = self._native_backend.get_integer_value(pp.grid2op.IntegerValueType.SHUNT_LOCAL_BUS)
         return p, q, v, bus
 
