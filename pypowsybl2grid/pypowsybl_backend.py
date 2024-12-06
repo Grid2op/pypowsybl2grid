@@ -33,7 +33,7 @@ class PyPowSyBlBackend(Backend):
                  lf_parameters: pp.loadflow.Parameters = DEFAULT_LF_PARAMETERS):
         Backend.__init__(self,
                          detailed_infos_for_cascading_failures=detailed_infos_for_cascading_failures,
-                         can_be_copied=False)
+                         can_be_copied=True)
         self._check_isolated_and_disconnected_injections = check_isolated_and_disconnected_injections
         self._consider_open_branch_reactive_flow = consider_open_branch_reactive_flow
         self.n_busbar_per_sub = n_busbar_per_sub
@@ -46,12 +46,12 @@ class PyPowSyBlBackend(Backend):
     def load_grid(self,
                   path: Union[os.PathLike, str],
                   filename: Optional[Union[os.PathLike, str]] = None) -> None:
-        logger.info("Loading network")
-
         start_time = time.time()
 
         # load network
         full_path = self.make_complete_path(path, filename)
+
+        logger.info(f"Loading network from '{full_path}'")
 
         if full_path.endswith('.json'):
             n_pdp = pdp.from_json(full_path)
@@ -145,7 +145,7 @@ class PyPowSyBlBackend(Backend):
         return result.status == pp.loadflow.ComponentStatus.CONVERGED or result.status == pp.loadflow.ComponentStatus.NO_CALCULATION
 
     def runpf(self, is_dc: bool = False) -> Tuple[bool, Union[Exception, None]]:
-        logger.info("Running powerflow")
+        logger.info(f"Running {'DC' if is_dc else 'AC'} powerflow")
 
         start_time = time.time()
 
