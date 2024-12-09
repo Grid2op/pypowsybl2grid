@@ -43,6 +43,8 @@ class PyPowSyBlBackend(Backend):
         self.shunts_data_available = True
         self.supported_grid_format = pp.network.get_import_supported_extensions()
 
+        self._native_backend = None
+
     def load_grid(self,
                   path: Union[os.PathLike, str],
                   filename: Optional[Union[os.PathLike, str]] = None) -> None:
@@ -58,6 +60,10 @@ class PyPowSyBlBackend(Backend):
             n = pp.network.convert_from_pandapower(n_pdp)
         else:
             n = pp.network.load(full_path)
+
+        if self._native_backend:
+            self._native_backend.close()
+            self._native_backend = None
 
         self._native_backend = pp.grid2op.Backend(n,
                                                   self._consider_open_branch_reactive_flow,
@@ -205,3 +211,4 @@ class PyPowSyBlBackend(Backend):
 
     def close(self) -> None:
         self._native_backend.close()
+        self._native_backend = None
