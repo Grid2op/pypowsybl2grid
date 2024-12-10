@@ -29,7 +29,7 @@ class PyPowSyBlBackend(Backend):
                  check_isolated_and_disconnected_injections = True,
                  consider_open_branch_reactive_flow = False,
                  n_busbar_per_sub = DEFAULT_N_BUSBAR_PER_SUB,
-                 connect_all_elements_to_first_bus = True,
+                 connect_all_elements_to_first_bus = False,
                  lf_parameters: pp.loadflow.Parameters = DEFAULT_LF_PARAMETERS):
         Backend.__init__(self,
                          detailed_infos_for_cascading_failures=detailed_infos_for_cascading_failures,
