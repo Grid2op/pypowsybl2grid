@@ -275,3 +275,22 @@ def test_iidm_network_update():
     # check IIDM network is up-to-date
     loads = backend.network.get_loads(attributes=['p0'])
     assert [11.0, 12.0, 13.0] == list(loads['p0'])
+
+
+@pytest.mark.skip(reason="To fix")
+def test_backend_with_bus_breaker_network():
+    backend = create_backend()
+
+    n = pp.network.create_eurostag_tutorial_example1_network()
+    load_grid(backend, n)
+
+    conv, _ = backend.runpf()
+    assert conv
+
+    apply_action(backend, {'set_bus': {'lines_or_id': {'NHV1_NHV2_1': 2}}})
+
+    conv, _ = backend.runpf()
+    assert conv
+
+    p_or, _, _, _ = backend.lines_or_info()
+    npt.assert_allclose(np.array([-0.049, 609.595, 610.329, 600.949]), p_or, rtol=TOLERANCE, atol=TOLERANCE)

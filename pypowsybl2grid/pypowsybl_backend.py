@@ -61,15 +61,22 @@ class PyPowSyBlBackend(Backend):
 
         if full_path.endswith('.json'):
             n_pdp = pdp.from_json(full_path)
-            n = pp.network.convert_from_pandapower(n_pdp)
+            network = pp.network.convert_from_pandapower(n_pdp)
         else:
-            n = pp.network.load(full_path)
+            network = pp.network.load(full_path)
 
+        self.load_grid_from_iidm(network)
+
+        end_time = time.time()
+        elapsed_time = (end_time - start_time) * 1000
+        logger.info(f"Network '{network.id}' loaded in {elapsed_time:.2f} ms")
+
+    def load_grid_from_iidm(self, network: pp.network.Network) -> None:
         if self._native_backend:
             self._native_backend.close()
             self._native_backend = None
 
-        self._native_backend = pp.grid2op.Backend(n,
+        self._native_backend = pp.grid2op.Backend(network,
                                                   self._consider_open_branch_reactive_flow,
                                                   self.n_busbar_per_sub,
                                                   self._connect_all_elements_to_first_bus)
@@ -115,10 +122,6 @@ class PyPowSyBlBackend(Backend):
 
         # thermal limits
         self.thermal_limit_a = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.BRANCH_PERMANENT_LIMIT_A)
-
-        end_time = time.time()
-        elapsed_time = (end_time - start_time) * 1000
-        logger.info(f"Network '{n.id}' loaded in {elapsed_time:.2f} ms")
 
     def apply_action(self, backend_action: Union["grid2op.Action._backendAction._BackendAction", None]) -> None:
         # the following few lines are highly recommended
