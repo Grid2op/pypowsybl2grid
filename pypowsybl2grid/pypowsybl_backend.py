@@ -45,6 +45,10 @@ class PyPowSyBlBackend(Backend):
 
         self._native_backend = None
 
+    @property
+    def network(self) -> pp.network.Network:
+        return self._native_backend.network if self._native_backend else None
+
     def load_grid(self,
                   path: Union[os.PathLike, str],
                   filename: Optional[Union[os.PathLike, str]] = None) -> None:

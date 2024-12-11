@@ -33,11 +33,15 @@ def create_backend(lf_parameters: pp.loadflow.Parameters = DEFAULT_LF_PARAMETERS
 
 
 def load_grid(backend: PyPowSyBlBackend, network: Network):
+    assert backend.network is None
+
     # backend need to grid as a file, dump it in a temporary folder
     with tempfile.TemporaryDirectory() as tmp_dir_name:
         grid_file = tmp_dir_name + "grid.xiidm"
         network.save(grid_file, 'XIIDM')
         backend.load_grid(grid_file)
+
+    assert backend.network is not None
 
     backend.assert_grid_correct()
 
@@ -242,3 +246,32 @@ def test_backend_with_node_breaker_network_and_generation_change():
     npt.assert_allclose(np.array([10.0, 11.0, 12.0]), load_p, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([3.0, 4.0, 5.0]), load_q, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([410.0, 409.776, 409.779]), load_v, rtol=TOLERANCE, atol=TOLERANCE)
+
+
+def test_iidm_network_update():
+    backend = create_backend()
+
+    n = create_simple_node_breaker_network()
+
+    load_grid(backend, n)
+
+    conv, _ = backend.runpf()
+    assert conv
+
+    loads = backend.network.get_loads(attributes=['p0'])
+    assert [10.0, 11.0, 12.0] == list(loads['p0'])
+
+    load_p, _, _ = backend.loads_info()
+    npt.assert_allclose(np.array([10.0, 11.0, 12.0]), load_p, rtol=TOLERANCE, atol=TOLERANCE)
+
+    apply_action(backend, {"injection": {"load_p": [11.0, 12.0, 13.0]}})
+
+    conv, _ = backend.runpf()
+    assert conv
+
+    load_p, _, _ = backend.loads_info()
+    npt.assert_allclose(np.array([11.0, 12.0, 13.0]), load_p, rtol=TOLERANCE, atol=TOLERANCE)
+
+    # check IIDM network is up-to-date
+    loads = backend.network.get_loads(attributes=['p0'])
+    assert [11.0, 12.0, 13.0] == list(loads['p0'])

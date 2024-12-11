@@ -546,7 +546,7 @@ pandapower = ["pandapower (>=2.4.11)"]
 type = "git"
 url = "https://github.com/powsybl/pypowsybl.git"
 reference = "grid2op"
-resolved_reference = "19a9d665cdca472dc09fe9a88f9d5ca1b3b77ded"
+resolved_reference = "66c06211fe866dfc0e3c797c328d5c728c296596"
 
 [[package]]
 name = "pytest"
