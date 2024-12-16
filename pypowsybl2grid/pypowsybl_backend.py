@@ -217,5 +217,6 @@ class PyPowSyBlBackend(Backend):
         self.load_grid(path, filename=grid_filename)
 
     def close(self) -> None:
-        self._native_backend.close()
-        self._native_backend = None
+        if self._native_backend:
+            self._native_backend.close()
+            self._native_backend = None
