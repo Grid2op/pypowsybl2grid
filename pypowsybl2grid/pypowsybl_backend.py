@@ -160,15 +160,18 @@ class PyPowSyBlBackend(Backend):
     def runpf(self, is_dc: bool = False) -> Tuple[bool, Union[Exception, None]]:
         logger.info(f"Running {'DC' if is_dc else 'AC'} powerflow")
 
-        start_time = time.time()
+        start_time = time.perf_counter()
 
-        if self._check_isolated_and_disconnected_injections and self._grid.check_isolated_and_disconnected_injections():
+        if self._check_isolated_and_disconnected_injections and self._native_backend.check_isolated_and_disconnected_injections():
             converged = False
         else:
-            results = self._grid.run_pf(is_dc, self._lf_parameters)
+            beg_ = time.perf_counter()
+            results = self._native_backend.run_pf(is_dc, self._lf_parameters)
+            end_ = time.perf_counter()
+            self.comp_time += end_ - beg_
             converged = self._is_converged(results[0])
 
-        end_time = time.time()
+        end_time = time.perf_counter()  # changed
         elapsed_time = (end_time - start_time) * 1000
         logger.info(f"Powerflow ran in {elapsed_time:.2f} ms")
 
