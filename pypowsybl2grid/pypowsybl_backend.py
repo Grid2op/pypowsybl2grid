@@ -43,11 +43,11 @@ class PyPowSyBlBackend(Backend):
         self.shunts_data_available = True
         self.supported_grid_format = pp.network.get_import_supported_extensions()
 
-        self._native_backend = None
+        self._grid = None
 
     @property
     def network(self) -> pp.network.Network:
-        return self._native_backend.network if self._native_backend else None
+        return self._grid.network if self._grid else None
 
     def load_grid(self,
                   path: Union[os.PathLike, str],
@@ -72,17 +72,17 @@ class PyPowSyBlBackend(Backend):
         logger.info(f"Network '{network.id}' loaded in {elapsed_time:.2f} ms")
 
     def load_grid_from_iidm(self, network: pp.network.Network) -> None:
-        if self._native_backend:
-            self._native_backend.close()
-            self._native_backend = None
+        if self._grid:
+            self._grid.close()
+            self._grid = None
 
-        self._native_backend = pp.grid2op.Backend(network,
-                                                  self._consider_open_branch_reactive_flow,
-                                                  self.n_busbar_per_sub,
-                                                  self._connect_all_elements_to_first_bus)
+        self._grid = pp.grid2op.Backend(network,
+                                        self._consider_open_branch_reactive_flow,
+                                        self.n_busbar_per_sub,
+                                        self._connect_all_elements_to_first_bus)
 
         # substations mapped to IIDM voltage levels
-        self.name_sub = self._native_backend.get_string_value(pp.grid2op.StringValueType.VOLTAGE_LEVEL_NAME)
+        self.name_sub = self._grid.get_string_value(pp.grid2op.StringValueType.VOLTAGE_LEVEL_NAME)
         self.n_sub = len(self.name_sub)
 
         self.can_handle_more_than_2_busbar()
@@ -90,38 +90,38 @@ class PyPowSyBlBackend(Backend):
         logger.info(f"{self.n_busbar_per_sub} busbars per substation")
 
         # loads
-        self.name_load = self._native_backend.get_string_value(pp.grid2op.StringValueType.LOAD_NAME)
+        self.name_load = self._grid.get_string_value(pp.grid2op.StringValueType.LOAD_NAME)
         self.n_load = len(self.name_load)
-        self.load_to_subid = self._native_backend.get_integer_value(pp.grid2op.IntegerValueType.LOAD_VOLTAGE_LEVEL_NUM)
+        self.load_to_subid = self._grid.get_integer_value(pp.grid2op.IntegerValueType.LOAD_VOLTAGE_LEVEL_NUM)
 
         # generators
-        self.name_gen = self._native_backend.get_string_value(pp.grid2op.StringValueType.GENERATOR_NAME)
+        self.name_gen = self._grid.get_string_value(pp.grid2op.StringValueType.GENERATOR_NAME)
         self.n_gen = len(self.name_gen)
-        self.gen_to_subid = self._native_backend.get_integer_value(pp.grid2op.IntegerValueType.GENERATOR_VOLTAGE_LEVEL_NUM)
+        self.gen_to_subid = self._grid.get_integer_value(pp.grid2op.IntegerValueType.GENERATOR_VOLTAGE_LEVEL_NUM)
 
         # shunts
-        self.name_shunt = self._native_backend.get_string_value(pp.grid2op.StringValueType.SHUNT_NAME)
+        self.name_shunt = self._grid.get_string_value(pp.grid2op.StringValueType.SHUNT_NAME)
         self.n_shunt = len(self.name_shunt)
-        self.shunt_to_subid = self._native_backend.get_integer_value(pp.grid2op.IntegerValueType.SHUNT_VOLTAGE_LEVEL_NUM)
+        self.shunt_to_subid = self._grid.get_integer_value(pp.grid2op.IntegerValueType.SHUNT_VOLTAGE_LEVEL_NUM)
 
         # batteries
         self.set_no_storage()
         # FIXME implement batteries
-        # self.name_storage = np.array(self._native_backend.get_string_value(pp.grid2op.StringValueType.BATTERY_NAME))
+        # self.name_storage = np.array(self._grid.get_string_value(pp.grid2op.StringValueType.BATTERY_NAME))
         # self.n_storage = len(self.name_storage)
         # self.storage_type = np.full(self.n_storage, fill_value="???")
-        # self.storage_to_subid = self._native_backend.get_integer_value(pp.grid2op.IntegerValueType.BATTERY_VOLTAGE_LEVEL_NUM).copy()
+        # self.storage_to_subid = self._grid.get_integer_value(pp.grid2op.IntegerValueType.BATTERY_VOLTAGE_LEVEL_NUM).copy()
 
         # lines and transformers
-        self.name_line = self._native_backend.get_string_value(pp.grid2op.StringValueType.BRANCH_NAME)
+        self.name_line = self._grid.get_string_value(pp.grid2op.StringValueType.BRANCH_NAME)
         self.n_line = len(self.name_line)
-        self.line_or_to_subid = self._native_backend.get_integer_value(pp.grid2op.IntegerValueType.BRANCH_VOLTAGE_LEVEL_NUM_1)
-        self.line_ex_to_subid = self._native_backend.get_integer_value(pp.grid2op.IntegerValueType.BRANCH_VOLTAGE_LEVEL_NUM_2)
+        self.line_or_to_subid = self._grid.get_integer_value(pp.grid2op.IntegerValueType.BRANCH_VOLTAGE_LEVEL_NUM_1)
+        self.line_ex_to_subid = self._grid.get_integer_value(pp.grid2op.IntegerValueType.BRANCH_VOLTAGE_LEVEL_NUM_2)
 
         self._compute_pos_big_topo()
 
         # thermal limits
-        self.thermal_limit_a = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.BRANCH_PERMANENT_LIMIT_A)
+        self.thermal_limit_a = self._grid.get_double_value(pp.grid2op.DoubleValueType.BRANCH_PERMANENT_LIMIT_A)
 
     def apply_action(self, backend_action: Union["grid2op.Action._backendAction._BackendAction", None]) -> None:
         # the following few lines are highly recommended
@@ -132,22 +132,22 @@ class PyPowSyBlBackend(Backend):
 
         start_time = time.time()
 
-        self._native_backend.update_double_value(pp.grid2op.UpdateDoubleValueType.UPDATE_LOAD_P, backend_action.load_p.values, backend_action.load_p.changed)
-        self._native_backend.update_double_value(pp.grid2op.UpdateDoubleValueType.UPDATE_LOAD_Q, backend_action.load_q.values, backend_action.load_q.changed)
-        self._native_backend.update_double_value(pp.grid2op.UpdateDoubleValueType.UPDATE_GENERATOR_P, backend_action.prod_p.values, backend_action.prod_p.changed)
-        self._native_backend.update_double_value(pp.grid2op.UpdateDoubleValueType.UPDATE_GENERATOR_V, backend_action.prod_v.values, backend_action.prod_v.changed)
+        self._grid.update_double_value(pp.grid2op.UpdateDoubleValueType.UPDATE_LOAD_P, backend_action.load_p.values, backend_action.load_p.changed)
+        self._grid.update_double_value(pp.grid2op.UpdateDoubleValueType.UPDATE_LOAD_Q, backend_action.load_q.values, backend_action.load_q.changed)
+        self._grid.update_double_value(pp.grid2op.UpdateDoubleValueType.UPDATE_GENERATOR_P, backend_action.prod_p.values, backend_action.prod_p.changed)
+        self._grid.update_double_value(pp.grid2op.UpdateDoubleValueType.UPDATE_GENERATOR_V, backend_action.prod_v.values, backend_action.prod_v.changed)
         # TODO shunts
 
         loads_bus = backend_action.get_loads_bus()
-        self._native_backend.update_integer_value(pp.grid2op.UpdateIntegerValueType.UPDATE_LOAD_BUS, loads_bus.values, loads_bus.changed)
+        self._grid.update_integer_value(pp.grid2op.UpdateIntegerValueType.UPDATE_LOAD_BUS, loads_bus.values, loads_bus.changed)
         generators_bus = backend_action.get_gens_bus()
-        self._native_backend.update_integer_value(pp.grid2op.UpdateIntegerValueType.UPDATE_GENERATOR_BUS, generators_bus.values, generators_bus.changed)
+        self._grid.update_integer_value(pp.grid2op.UpdateIntegerValueType.UPDATE_GENERATOR_BUS, generators_bus.values, generators_bus.changed)
         shunt_bus = backend_action.shunt_bus
-        self._native_backend.update_integer_value(pp.grid2op.UpdateIntegerValueType.UPDATE_SHUNT_BUS, shunt_bus.values, shunt_bus.changed)
+        self._grid.update_integer_value(pp.grid2op.UpdateIntegerValueType.UPDATE_SHUNT_BUS, shunt_bus.values, shunt_bus.changed)
         lines_or_bus = backend_action.get_lines_or_bus()
-        self._native_backend.update_integer_value(pp.grid2op.UpdateIntegerValueType.UPDATE_BRANCH_BUS1, lines_or_bus.values, lines_or_bus.changed)
+        self._grid.update_integer_value(pp.grid2op.UpdateIntegerValueType.UPDATE_BRANCH_BUS1, lines_or_bus.values, lines_or_bus.changed)
         lines_ex_bus = backend_action.get_lines_ex_bus()
-        self._native_backend.update_integer_value(pp.grid2op.UpdateIntegerValueType.UPDATE_BRANCH_BUS2, lines_ex_bus.values, lines_ex_bus.changed)
+        self._grid.update_integer_value(pp.grid2op.UpdateIntegerValueType.UPDATE_BRANCH_BUS2, lines_ex_bus.values, lines_ex_bus.changed)
 
         end_time = time.time()
         elapsed_time = (end_time - start_time) * 1000
@@ -162,10 +162,10 @@ class PyPowSyBlBackend(Backend):
 
         start_time = time.time()
 
-        if self._check_isolated_and_disconnected_injections and self._native_backend.check_isolated_and_disconnected_injections():
+        if self._check_isolated_and_disconnected_injections and self._grid.check_isolated_and_disconnected_injections():
             converged = False
         else:
-            results = self._native_backend.run_pf(is_dc, self._lf_parameters)
+            results = self._grid.run_pf(is_dc, self._lf_parameters)
             converged = self._is_converged(results[0])
 
         end_time = time.time()
@@ -175,39 +175,39 @@ class PyPowSyBlBackend(Backend):
         return converged, None if converged else DivergingPowerflow()
 
     def get_topo_vect(self) -> np.ndarray:
-        return self._native_backend.get_integer_value(pp.grid2op.IntegerValueType.TOPO_VECT)
+        return self._grid.get_integer_value(pp.grid2op.IntegerValueType.TOPO_VECT)
 
     def generators_info(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        p = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.GENERATOR_P)
-        q = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.GENERATOR_Q)
-        v = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.GENERATOR_V)
+        p = self._grid.get_double_value(pp.grid2op.DoubleValueType.GENERATOR_P)
+        q = self._grid.get_double_value(pp.grid2op.DoubleValueType.GENERATOR_Q)
+        v = self._grid.get_double_value(pp.grid2op.DoubleValueType.GENERATOR_V)
         return p, q, v
 
     def loads_info(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        p = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.LOAD_P)
-        q = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.LOAD_Q)
-        v = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.LOAD_V)
+        p = self._grid.get_double_value(pp.grid2op.DoubleValueType.LOAD_P)
+        q = self._grid.get_double_value(pp.grid2op.DoubleValueType.LOAD_Q)
+        v = self._grid.get_double_value(pp.grid2op.DoubleValueType.LOAD_V)
         return p, q, v
 
     def shunt_info(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        p = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.SHUNT_P)
-        q = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.SHUNT_Q)
-        v = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.SHUNT_V)
-        bus = self._native_backend.get_integer_value(pp.grid2op.IntegerValueType.SHUNT_LOCAL_BUS)
+        p = self._grid.get_double_value(pp.grid2op.DoubleValueType.SHUNT_P)
+        q = self._grid.get_double_value(pp.grid2op.DoubleValueType.SHUNT_Q)
+        v = self._grid.get_double_value(pp.grid2op.DoubleValueType.SHUNT_V)
+        bus = self._grid.get_integer_value(pp.grid2op.IntegerValueType.SHUNT_LOCAL_BUS)
         return p, q, v, bus
 
     def lines_or_info(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        p = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.BRANCH_P1)
-        q = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.BRANCH_Q1)
-        v = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.BRANCH_V1)
-        a = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.BRANCH_I1)
+        p = self._grid.get_double_value(pp.grid2op.DoubleValueType.BRANCH_P1)
+        q = self._grid.get_double_value(pp.grid2op.DoubleValueType.BRANCH_Q1)
+        v = self._grid.get_double_value(pp.grid2op.DoubleValueType.BRANCH_V1)
+        a = self._grid.get_double_value(pp.grid2op.DoubleValueType.BRANCH_I1)
         return p, q, v, a
 
     def lines_ex_info(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        p = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.BRANCH_P2)
-        q = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.BRANCH_Q2)
-        v = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.BRANCH_V2)
-        a = self._native_backend.get_double_value(pp.grid2op.DoubleValueType.BRANCH_I2)
+        p = self._grid.get_double_value(pp.grid2op.DoubleValueType.BRANCH_P2)
+        q = self._grid.get_double_value(pp.grid2op.DoubleValueType.BRANCH_Q2)
+        v = self._grid.get_double_value(pp.grid2op.DoubleValueType.BRANCH_V2)
+        a = self._grid.get_double_value(pp.grid2op.DoubleValueType.BRANCH_I2)
         return p, q, v, a
 
     def reset(self,
@@ -217,6 +217,6 @@ class PyPowSyBlBackend(Backend):
         self.load_grid(path, filename=grid_filename)
 
     def close(self) -> None:
-        if self._native_backend:
-            self._native_backend.close()
-            self._native_backend = None
+        if self._grid:
+            self._grid.close()
+            self._grid = None
