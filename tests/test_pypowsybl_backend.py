@@ -14,8 +14,7 @@ import pypowsybl as pp
 import pytest
 from pypowsybl.network import Network
 
-from pypowsybl2grid.network_cache import DEFAULT_LF_PARAMETERS
-from pypowsybl2grid.pypowsybl_backend import PyPowSyBlBackend
+from pypowsybl2grid.pypowsybl_backend import PyPowSyBlBackend, DEFAULT_LF_PARAMETERS
 from tests.simple_node_breaker_network import create_simple_node_breaker_network
 
 TOLERANCE = 1e-3
@@ -29,15 +28,20 @@ def setup():
 def create_backend(lf_parameters: pp.loadflow.Parameters = DEFAULT_LF_PARAMETERS):
     return PyPowSyBlBackend(check_isolated_and_disconnected_injections=False,
                             consider_open_branch_reactive_flow=True,
+                            connect_all_elements_to_first_bus=False,
                             lf_parameters=lf_parameters)
 
 
 def load_grid(backend: PyPowSyBlBackend, network: Network):
+    assert backend.network is None
+
     # backend need to grid as a file, dump it in a temporary folder
     with tempfile.TemporaryDirectory() as tmp_dir_name:
         grid_file = tmp_dir_name + "grid.xiidm"
         network.save(grid_file, 'XIIDM')
         backend.load_grid(grid_file)
+
+    assert backend.network is not None
 
     backend.assert_grid_correct()
 
@@ -62,6 +66,7 @@ def test_backend_with_node_breaker_network():
     p_or, q_or, v_or, _ = backend.lines_or_info()
     p_ex, q_ex, v_ex, _ = backend.lines_ex_info()
     assert ['LINE12', 'LINE13', 'LINE23'] == backend.name_line.tolist()
+    assert [1, 1, 1, 1, 1, 1, 1, 1, 1, 1] == backend.get_topo_vect().tolist()
     npt.assert_allclose(np.array([10.532, 12.469, -0.468]), p_or, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([4.0, 5.033, -0.015]), q_or, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([403.0, 403.0, 402.881]), v_or, rtol=TOLERANCE, atol=TOLERANCE)
@@ -73,6 +78,10 @@ def test_backend_with_node_breaker_network():
     # disconnect line 12
     line12_num = 0
     apply_action(backend, {"set_line_status": [(line12_num, -1)]})
+    topo_vect = backend.get_topo_vect()
+    assert topo_vect[backend.line_or_pos_topo_vect[line12_num]] == -1
+    assert topo_vect[backend.line_ex_pos_topo_vect[line12_num]] == -1
+    assert [1, 1, -1, 1, 1, 1, -1, 1, 1, 1] == topo_vect.tolist()
 
     conv, _ = backend.runpf()
     assert conv
@@ -92,6 +101,7 @@ def test_backend_with_node_breaker_network():
 
     # reconnect line 12
     apply_action(backend, {"set_line_status": [(line12_num, 1)]})
+    assert [1, 1, 1, 1, 1, 1, 1, 1, 1, 1] == backend.get_topo_vect().tolist()
 
     conv, _ = backend.runpf()
     assert conv
@@ -109,6 +119,7 @@ def test_backend_with_node_breaker_network():
     # connect line 13 to bbs 1 of VL1 instead of bss2
     assert ['VL1', 'VL2', 'VL3'] == backend.name_sub.tolist()
     apply_action(backend, {'set_bus': {'lines_or_id': {'LINE12': 2}}})
+    assert [1, 1, 2, 1, 1, 1, 1, 1, 1, 1] == backend.get_topo_vect().tolist()
 
     conv, _ = backend.runpf()
     assert conv
@@ -235,3 +246,51 @@ def test_backend_with_node_breaker_network_and_generation_change():
     npt.assert_allclose(np.array([10.0, 11.0, 12.0]), load_p, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([3.0, 4.0, 5.0]), load_q, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([410.0, 409.776, 409.779]), load_v, rtol=TOLERANCE, atol=TOLERANCE)
+
+
+def test_iidm_network_update():
+    backend = create_backend()
+
+    n = create_simple_node_breaker_network()
+
+    load_grid(backend, n)
+
+    conv, _ = backend.runpf()
+    assert conv
+
+    loads = backend.network.get_loads(attributes=['p0'])
+    assert [10.0, 11.0, 12.0] == list(loads['p0'])
+
+    load_p, _, _ = backend.loads_info()
+    npt.assert_allclose(np.array([10.0, 11.0, 12.0]), load_p, rtol=TOLERANCE, atol=TOLERANCE)
+
+    apply_action(backend, {"injection": {"load_p": [11.0, 12.0, 13.0]}})
+
+    conv, _ = backend.runpf()
+    assert conv
+
+    load_p, _, _ = backend.loads_info()
+    npt.assert_allclose(np.array([11.0, 12.0, 13.0]), load_p, rtol=TOLERANCE, atol=TOLERANCE)
+
+    # check IIDM network is up-to-date
+    loads = backend.network.get_loads(attributes=['p0'])
+    assert [11.0, 12.0, 13.0] == list(loads['p0'])
+
+
+@pytest.mark.skip(reason="To fix")
+def test_backend_with_bus_breaker_network():
+    backend = create_backend()
+
+    n = pp.network.create_eurostag_tutorial_example1_network()
+    load_grid(backend, n)
+
+    conv, _ = backend.runpf()
+    assert conv
+
+    apply_action(backend, {'set_bus': {'lines_or_id': {'NHV1_NHV2_1': 2}}})
+
+    conv, _ = backend.runpf()
+    assert conv
+
+    p_or, _, _, _ = backend.lines_or_info()
+    npt.assert_allclose(np.array([-0.049, 609.595, 610.329, 600.949]), p_or, rtol=TOLERANCE, atol=TOLERANCE)
