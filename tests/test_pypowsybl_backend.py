@@ -78,6 +78,7 @@ def test_backend_with_node_breaker_network():
     # disconnect line 12
     line12_num = 0
     apply_action(backend, {"set_line_status": [(line12_num, -1)]})
+    backend.fetch_data()
     topo_vect = backend.get_topo_vect()
     assert topo_vect[backend.line_or_pos_topo_vect[line12_num]] == -1
     assert topo_vect[backend.line_ex_pos_topo_vect[line12_num]] == -1
@@ -101,6 +102,7 @@ def test_backend_with_node_breaker_network():
 
     # reconnect line 12
     apply_action(backend, {"set_line_status": [(line12_num, 1)]})
+    backend.fetch_data()
     assert [1, 1, 1, 1, 1, 1, 1, 1, 1, 1] == backend.get_topo_vect().tolist()
 
     conv, _ = backend.runpf()
@@ -119,6 +121,7 @@ def test_backend_with_node_breaker_network():
     # connect line 13 to bbs 1 of VL1 instead of bss2
     assert ['VL1', 'VL2', 'VL3'] == backend.name_sub.tolist()
     apply_action(backend, {'set_bus': {'lines_or_id': {'LINE12': 2}}})
+    backend.fetch_data()
     assert [1, 1, 2, 1, 1, 1, 1, 1, 1, 1] == backend.get_topo_vect().tolist()
 
     conv, _ = backend.runpf()
