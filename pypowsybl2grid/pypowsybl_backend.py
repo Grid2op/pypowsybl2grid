@@ -49,21 +49,21 @@ class PyPowSyBlBackend(Backend):
         self.supported_grid_format = pp.network.get_import_supported_extensions()
 
         self._grid = None
-        
+
         # caching of the results
         self._gen_p = None
         self._gen_q = None
         self._gen_v = None
-        
+
         self._load_p = None
         self._load_q = None
         self._load_v = None
-        
+
         self._por = None
         self._qor = None
         self._aor = None
         self._vor = None
-        
+
         self._pex = None
         self._qex = None
         self._aex = None
@@ -73,9 +73,9 @@ class PyPowSyBlBackend(Backend):
         self._shunt_q = None
         self._shunt_v = None
         self._shunt_bus = None
-        
+
         self._topo_vect = None
-        
+
     @property
     def network(self) -> pp.network.Network:
         return self._grid.network if self._grid else None
@@ -153,21 +153,21 @@ class PyPowSyBlBackend(Backend):
 
         # thermal limits
         self.thermal_limit_a = self._grid.get_double_value(pp.grid2op.DoubleValueType.BRANCH_PERMANENT_LIMIT_A)
-        
+
         # cached data
         self._gen_p = np.empty(self.n_gen, dtype=dt_float)
         self._gen_q = np.empty(self.n_gen, dtype=dt_float)
         self._gen_v = np.empty(self.n_gen, dtype=dt_float)
-        
+
         self._load_p = np.empty(self.n_load, dtype=dt_float)
         self._load_q = np.empty(self.n_load, dtype=dt_float)
         self._load_v = np.empty(self.n_load, dtype=dt_float)
-        
+
         self._por = np.empty(self.n_line, dtype=dt_float)
         self._qor = np.empty(self.n_line, dtype=dt_float)
         self._aor = np.empty(self.n_line, dtype=dt_float)
         self._vor = np.empty(self.n_line, dtype=dt_float)
-        
+
         self._pex = np.empty(self.n_line, dtype=dt_float)
         self._qex = np.empty(self.n_line, dtype=dt_float)
         self._aex = np.empty(self.n_line, dtype=dt_float)
@@ -177,10 +177,10 @@ class PyPowSyBlBackend(Backend):
         self._shunt_q = np.empty(self.n_shunt, dtype=dt_float)
         self._shunt_v = np.empty(self.n_shunt, dtype=dt_float)
         self._shunt_bus = np.empty(self.n_shunt, dtype=dt_int)
-        
+
         self._topo_vect = np.empty(self.dim_topo, dtype=dt_int)
         self.fetch_data()
-        
+
     def apply_action(self, backend_action: Union["grid2op.Action._backendAction._BackendAction", None]) -> None:
         # the following few lines are highly recommended
         if backend_action is None:
@@ -233,7 +233,7 @@ class PyPowSyBlBackend(Backend):
             self.set_all_nans()
         else:
             self.fetch_data()
-            
+
         end_time = time.perf_counter()
         elapsed_time = (end_time - start_time) * 1000
         logger.info(f"Powerflow ran in {elapsed_time:.2f} ms")
@@ -246,21 +246,21 @@ class PyPowSyBlBackend(Backend):
         self._fetch_line_or()
         self._fetch_line_ex()
         self._fetch_shunt()
-    
+
     def set_all_nans(self):
         self._gen_p[:] = np.nan
         self._gen_q[:] = np.nan
         self._gen_v[:] = np.nan
-        
+
         self._load_p[:] = np.nan
         self._load_q[:] = np.nan
         self._load_v[:] = np.nan
-        
+
         self._por[:] = np.nan
         self._qor[:] = np.nan
         self._aor[:] = np.nan
         self._vor[:] = np.nan
-        
+
         self._pex[:] = np.nan
         self._qex[:] = np.nan
         self._aex[:] = np.nan
@@ -270,18 +270,18 @@ class PyPowSyBlBackend(Backend):
         self._shunt_q[:] = np.nan
         self._shunt_v[:] = np.nan
         self._shunt_bus[:] = -1
-        
+
         self._topo_vect[:] = -1
-        
+
     def get_topo_vect(self)-> np.ndarray:
         return 1 * self._topo_vect
-    
+
     def _fetch_topo_vect(self):
         self._topo_vect[:] = self._grid.get_integer_value(pp.grid2op.IntegerValueType.TOPO_VECT)
 
     def generators_info(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         return 1 * self._gen_p, 1* self._gen_q, 1* self._gen_v
-    
+
     def _fetch_gen(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         self._gen_p = self._grid.get_double_value(pp.grid2op.DoubleValueType.GENERATOR_P)
         self._gen_q = self._grid.get_double_value(pp.grid2op.DoubleValueType.GENERATOR_Q)
@@ -289,7 +289,7 @@ class PyPowSyBlBackend(Backend):
 
     def loads_info(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         return 1. * self._load_p, 1.* self._load_q, 1. * self._load_v
-    
+
     def _fetch_load(self):
         self._load_p[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.LOAD_P)
         self._load_q[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.LOAD_Q)
@@ -297,7 +297,7 @@ class PyPowSyBlBackend(Backend):
 
     def shunt_info(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         return 1. * self._shunt_p, 1. * self._shunt_q, 1. * self._shunt_v, 1 * self._shunt_bus
-    
+
     def _fetch_shunt(self):
         self._shunt_p[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.SHUNT_P)
         self._shunt_q[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.SHUNT_Q)
@@ -306,8 +306,8 @@ class PyPowSyBlBackend(Backend):
 
     def lines_or_info(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         return 1. * self._por, 1. * self._qor, 1. * self._vor, 1. * self._aor
-    
-    def _fetch_line_or(self): 
+
+    def _fetch_line_or(self):
         self._por[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.BRANCH_P1)
         self._qor[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.BRANCH_Q1)
         self._vor[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.BRANCH_V1)
@@ -315,7 +315,7 @@ class PyPowSyBlBackend(Backend):
 
     def lines_ex_info(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         return 1. * self._pex, 1. * self._qex, 1. * self._vex, 1. * self._aex
-    
+
     def _fetch_line_ex(self):
         self._pex[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.BRANCH_P2)
         self._qex[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.BRANCH_Q2)
@@ -332,5 +332,5 @@ class PyPowSyBlBackend(Backend):
         if self._grid:
             self._grid.close()
             self._grid = None
-            
+
         self.set_all_nans()

@@ -9,10 +9,8 @@ license = "MPL-2.0"
 [tool.poetry.dependencies]
 python = "^3.9"
 numpy = "1.26.4"
-#pypowsybl = "^1.9.0"
-pypowsybl = { git = "https://github.com/powsybl/pypowsybl.git", branch = "grid2op" }
-#grid2op = "^1.11.0
-grid2op = { git = "https://github.com/Grid2Op/grid2op.git", branch = "dev_1.11.0" }
+pypowsybl = "^1.9.0"
+grid2op = "^1.10.5"
 sortedcontainers = "^2.4.0"
 
 [tool.poetry.group.test.dependencies]
