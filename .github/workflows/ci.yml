@@ -10,6 +10,13 @@ jobs:
   build:
     runs-on: ubuntu-20.04
 
+    environment:
+          name: pypi
+          url: https://pypi.org/p/pypowsybl2grid
+
+    permissions:
+      id-token: write
+
     steps:
       - name: Install Ubuntu packages
         env:
@@ -18,12 +25,6 @@ jobs:
           sudo apt update
           sudo apt -y install maven python3.9 python3.9-dev python3.9-venv pipx
           pipx install poetry
-
-      - name: Setup GraalVM
-        uses: graalvm/setup-graalvm@v1
-        with:
-          java-version: '17'
-          distribution: 'graalvm'
 
       - name: Checkout sources
         uses: actions/checkout@v4
@@ -37,11 +38,6 @@ jobs:
       - name: Run tests
         run: poetry run pytest
 
-      - name: Copy PyPowSyBl wheel
-        run: cp $(find $HOME/.cache/pypoetry/artifacts/ -name pypowsybl*.whl) dist/
-
-      - name: Upload wheel
-        uses: actions/upload-artifact@v4
-        with:
-          name: pypowsybl2grid-wheels
-          path: dist/*.whl
+      - name: Publish on PyPi
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: pypa/gh-action-pypi-publish@release/v1
