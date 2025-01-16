@@ -38,15 +38,6 @@ jobs:
       - name: Run tests
         run: poetry run pytest
 
-      - name: Copy PyPowSyBl wheel
-        run: cp $(find $HOME/.cache/pypoetry/artifacts/ -name pypowsybl*.whl) dist/
-
-      - name: Upload wheel
-        uses: actions/upload-artifact@v4
-        with:
-          name: pypowsybl2grid-wheels
-          path: dist/*.whl
-
       - name: Publish on PyPi
 #        if: startsWith(github.ref, 'refs/tags/')
         uses: pypa/gh-action-pypi-publish@release/v1
