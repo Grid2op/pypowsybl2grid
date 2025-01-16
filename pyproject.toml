@@ -2,7 +2,7 @@
 name = "pypowsybl2grid"
 version = "0.1.0"
 description = "An integration between Grid2op and PyPowSybl"
-authors = ["Geoffroy Jamgotchian <geoffroy.jamgotchian at rte-france.com>"]
+authors = ["Geoffroy Jamgotchian <geoffroy.jamgotchian@rte-france.com>"]
 readme = "README.md"
 license = "MPL-2.0"
 
