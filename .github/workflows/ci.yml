@@ -10,6 +10,13 @@ jobs:
   build:
     runs-on: ubuntu-20.04
 
+    environment:
+          name: testpypi
+          url: https://test.pypi.org/p/pypowsybl2grid
+
+    permissions:
+      id-token: write
+
     steps:
       - name: Install Ubuntu packages
         env:
@@ -45,3 +52,9 @@ jobs:
         with:
           name: pypowsybl2grid-wheels
           path: dist/*.whl
+
+      - name: Publish on PyPi
+#        if: startsWith(github.ref, 'refs/tags/')
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
