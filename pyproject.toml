@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pypowsybl2grid"
-version = "0.1.0"
+version = "0.2.0"
 description = "An integration between Grid2op and PyPowSybl"
 authors = ["Geoffroy Jamgotchian <geoffroy.jamgotchian@rte-france.com>"]
 readme = "README.md"
