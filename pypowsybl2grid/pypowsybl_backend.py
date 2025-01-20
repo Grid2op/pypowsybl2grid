@@ -282,7 +282,7 @@ class PyPowSyBlBackend(Backend):
     def generators_info(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         return 1 * self._gen_p, 1* self._gen_q, 1* self._gen_v
 
-    def _fetch_gen(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def _fetch_gen(self):
         self._gen_p = self._grid.get_double_value(pp.grid2op.DoubleValueType.GENERATOR_P)
         self._gen_q = self._grid.get_double_value(pp.grid2op.DoubleValueType.GENERATOR_Q)
         self._gen_v = self._grid.get_double_value(pp.grid2op.DoubleValueType.GENERATOR_V)
