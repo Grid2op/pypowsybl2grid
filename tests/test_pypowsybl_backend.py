@@ -25,6 +25,21 @@ def setup():
     logging.getLogger('powsybl').setLevel(logging.INFO)
 
 
+@pytest.fixture
+def backend():
+    backend = create_backend()
+    yield backend
+    backend.close()
+
+
+@pytest.fixture
+def backend_advanced_lf_parameters():
+    parameters = pp.loadflow.Parameters(voltage_init_mode=pp.loadflow.VoltageInitMode.DC_VALUES, balance_type=pp.loadflow.BalanceType.PROPORTIONAL_TO_LOAD)
+    backend = create_backend(parameters)
+    yield backend
+    backend.close()
+
+
 def create_backend(lf_parameters: pp.loadflow.Parameters = DEFAULT_LF_PARAMETERS):
     return PyPowSyBlBackend(check_isolated_and_disconnected_injections=False,
                             consider_open_branch_reactive_flow=True,
@@ -54,9 +69,7 @@ def apply_action(backend: PyPowSyBlBackend, action_dict: Dict):
     backend.apply_action(bk_act)
 
 
-def test_backend_with_node_breaker_network():
-    backend = create_backend()
-
+def test_backend_with_node_breaker_network(backend):
     n = create_simple_node_breaker_network()
     load_grid(backend, n)
 
@@ -138,9 +151,7 @@ def test_backend_with_node_breaker_network():
     assert [1, 1, 2, 1, 1, 1, 1, 1, 1, 1] == backend.get_topo_vect().tolist()
 
 
-def test_backend_with_node_breaker_network_and_an_initial_topo():
-    backend = create_backend()
-
+def test_backend_with_node_breaker_network_and_an_initial_topo(backend):
     n = create_simple_node_breaker_network()
     # open the coupler to get 2 buses at VL1
     n.update_switches(id='COUPLER1_BREAKER', open=True)
@@ -160,9 +171,7 @@ def test_backend_with_node_breaker_network_and_an_initial_topo():
     assert [2, 1, 1, 2, 1, 1, 1, 1, 1, 1] == backend.get_topo_vect().tolist()
 
 
-def test_backend_with_node_breaker_network_and_load_change():
-    backend = create_backend()
-
+def test_backend_with_node_breaker_network_and_load_change(backend):
     n = create_simple_node_breaker_network()
 
     load_grid(backend, n)
@@ -197,63 +206,58 @@ def test_backend_with_node_breaker_network_and_load_change():
     npt.assert_allclose(np.array([403.0, 402.773, 402.775]), load_v, rtol=TOLERANCE, atol=TOLERANCE)
 
 
-def test_backend_with_node_breaker_network_and_generation_change():
-    parameters = pp.loadflow.Parameters(voltage_init_mode=pp.loadflow.VoltageInitMode.DC_VALUES, balance_type=pp.loadflow.BalanceType.PROPORTIONAL_TO_LOAD)
-    backend = create_backend(parameters)
-
+def test_backend_with_node_breaker_network_and_generation_change(backend_advanced_lf_parameters):
     n = create_simple_node_breaker_network()
 
-    load_grid(backend, n)
+    load_grid(backend_advanced_lf_parameters, n)
 
-    conv, _ = backend.runpf()
+    conv, _ = backend_advanced_lf_parameters.runpf()
     assert conv
 
-    gen_p, gen_q, gen_v = backend.generators_info()
+    gen_p, gen_q, gen_v = backend_advanced_lf_parameters.generators_info()
     npt.assert_allclose(np.array([33.0]), gen_p, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([12.033]), gen_q, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([403.0]), gen_v, rtol=TOLERANCE, atol=TOLERANCE)
 
-    load_p, load_q, load_v = backend.loads_info()
+    load_p, load_q, load_v = backend_advanced_lf_parameters.loads_info()
     npt.assert_allclose(np.array([10.0, 11.0, 12.0]), load_p, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([3.0, 4.0, 5.0]), load_q, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([403.0, 402.773, 402.775]), load_v, rtol=TOLERANCE, atol=TOLERANCE)
 
-    apply_action(backend, {"injection": {"prod_p": [43.0],
+    apply_action(backend_advanced_lf_parameters, {"injection": {"prod_p": [43.0],
                                                    "prod_v": [403.0]}})
 
-    conv, _ = backend.runpf()
+    conv, _ = backend_advanced_lf_parameters.runpf()
     assert conv
 
-    gen_p, gen_q, gen_v = backend.generators_info()
+    gen_p, gen_q, gen_v = backend_advanced_lf_parameters.generators_info()
     npt.assert_allclose(np.array([43.0]), gen_p, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([12.052]), gen_q, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([403.0]), gen_v, rtol=TOLERANCE, atol=TOLERANCE)
 
-    load_p, load_q, load_v = backend.loads_info()
+    load_p, load_q, load_v = backend_advanced_lf_parameters.loads_info()
     npt.assert_allclose(np.array([13.029, 14.332, 15.635]), load_p, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([3.0, 4.0, 5.0]), load_q, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([403.0, 402.773, 402.775]), load_v, rtol=TOLERANCE, atol=TOLERANCE)
 
-    apply_action(backend, {"injection": {"prod_p": [33.0],
+    apply_action(backend_advanced_lf_parameters, {"injection": {"prod_p": [33.0],
                                                    "prod_v": [410.0]}})
 
-    conv, _ = backend.runpf()
+    conv, _ = backend_advanced_lf_parameters.runpf()
     assert conv
 
-    gen_p, gen_q, gen_v = backend.generators_info()
+    gen_p, gen_q, gen_v = backend_advanced_lf_parameters.generators_info()
     npt.assert_allclose(np.array([33.0]), gen_p, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([12.032]), gen_q, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([410.0]), gen_v, rtol=TOLERANCE, atol=TOLERANCE)
 
-    load_p, load_q, load_v = backend.loads_info()
+    load_p, load_q, load_v = backend_advanced_lf_parameters.loads_info()
     npt.assert_allclose(np.array([10.0, 11.0, 12.0]), load_p, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([3.0, 4.0, 5.0]), load_q, rtol=TOLERANCE, atol=TOLERANCE)
     npt.assert_allclose(np.array([410.0, 409.776, 409.779]), load_v, rtol=TOLERANCE, atol=TOLERANCE)
 
 
-def test_iidm_network_update():
-    backend = create_backend()
-
+def test_iidm_network_update(backend):
     n = create_simple_node_breaker_network()
 
     load_grid(backend, n)
@@ -281,9 +285,7 @@ def test_iidm_network_update():
 
 
 @pytest.mark.skip(reason="To fix")
-def test_backend_with_bus_breaker_network():
-    backend = create_backend()
-
+def test_backend_with_bus_breaker_network(backend):
     n = pp.network.create_eurostag_tutorial_example1_network()
     load_grid(backend, n)
 
@@ -297,3 +299,11 @@ def test_backend_with_bus_breaker_network():
 
     p_or, _, _, _ = backend.lines_or_info()
     npt.assert_allclose(np.array([-0.049, 609.595, 610.329, 600.949]), p_or, rtol=TOLERANCE, atol=TOLERANCE)
+
+
+def test_backend_copy(backend):
+    n = pp.network.create_eurostag_tutorial_example1_network()
+    load_grid(backend, n)
+    backend_cpy = backend.copy()
+    assert isinstance(backend_cpy, type(backend))
+    backend_cpy.close()

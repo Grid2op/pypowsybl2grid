@@ -3,7 +3,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 # SPDX-License-Identifier: MPL-2.0
-
+import copy
 import logging
 import os
 import time
@@ -19,6 +19,7 @@ import numpy as np
 import pandapower as pdp
 import pypowsybl as pp
 import pypowsybl.grid2op
+from typing_extensions import Self
 
 logger = logging.getLogger(__name__)
 
@@ -178,7 +179,6 @@ class PyPowSyBlBackend(Backend):
         self._shunt_v = np.empty(self.n_shunt, dtype=dt_float)
         self._shunt_bus = np.empty(self.n_shunt, dtype=dt_int)
 
-        self._topo_vect = np.empty(self.dim_topo, dtype=dt_int)
         self.fetch_data()
 
     def apply_action(self, backend_action: Union["grid2op.Action._backendAction._BackendAction", None]) -> None:
@@ -277,12 +277,12 @@ class PyPowSyBlBackend(Backend):
         return 1 * self._topo_vect
 
     def _fetch_topo_vect(self):
-        self._topo_vect[:] = self._grid.get_integer_value(pp.grid2op.IntegerValueType.TOPO_VECT)
+        self._topo_vect = self._grid.get_integer_value(pp.grid2op.IntegerValueType.TOPO_VECT)
 
     def generators_info(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         return 1 * self._gen_p, 1* self._gen_q, 1* self._gen_v
 
-    def _fetch_gen(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def _fetch_gen(self):
         self._gen_p = self._grid.get_double_value(pp.grid2op.DoubleValueType.GENERATOR_P)
         self._gen_q = self._grid.get_double_value(pp.grid2op.DoubleValueType.GENERATOR_Q)
         self._gen_v = self._grid.get_double_value(pp.grid2op.DoubleValueType.GENERATOR_V)
@@ -327,6 +327,15 @@ class PyPowSyBlBackend(Backend):
               grid_filename : Optional[Union[os.PathLike, str]]=None) -> None:
         logger.info("Reset backend")
         self.load_grid(path, filename=grid_filename)
+
+    def copy(self) -> Self:
+        logger.info("Copy backend")
+        res = type(self)(self.detailed_infos_for_cascading_failures, self._check_isolated_and_disconnected_injections, self._consider_open_branch_reactive_flow,
+                         self.n_busbar_per_sub, self._connect_all_elements_to_first_bus, self._lf_parameters)
+        if self._grid:
+            network_copy = copy.deepcopy(self._grid.network)
+            res.load_grid_from_iidm(network_copy)
+        return res
 
     def close(self) -> None:
         if self._grid:
