@@ -83,7 +83,15 @@ class PyPowSyBlBackend(Backend):
     def load_grid(self,
                   path: Union[os.PathLike, str],
                   filename: Optional[Union[os.PathLike, str]] = None) -> None:
-        start_time = time.time()
+        start_time = time.perf_counter()
+        cls = type(self)
+        if hasattr(cls, "can_handle_more_than_2_busbar"):
+            # grid2op version >= 1.10.0 then we use this
+            self.can_handle_more_than_2_busbar()
+            
+        if hasattr(cls, "can_handle_detachment"):
+            # grid2op version >= 1.11.0 then we use this
+            self.can_handle_detachment()
 
         # load network
         full_path = self.make_complete_path(path, filename)
@@ -98,7 +106,7 @@ class PyPowSyBlBackend(Backend):
 
         self.load_grid_from_iidm(network)
 
-        end_time = time.time()
+        end_time = time.perf_counter()
         elapsed_time = (end_time - start_time) * 1000
         logger.info(f"Network '{network.id}' loaded in {elapsed_time:.2f} ms")
 
