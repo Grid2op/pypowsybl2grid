@@ -8,6 +8,7 @@ import logging
 import os
 import time
 from typing import Optional, Tuple, Union
+import warnings
 
 import grid2op
 from grid2op.dtypes import dt_float, dt_int
@@ -27,15 +28,22 @@ DEFAULT_LF_PARAMETERS = pp.loadflow.Parameters(voltage_init_mode=pp.loadflow.Vol
 class PyPowSyBlBackend(Backend):
 
     def __init__(self,
-                 detailed_infos_for_cascading_failures=False,
-                 check_isolated_and_disconnected_injections = True,
-                 consider_open_branch_reactive_flow = False,
-                 n_busbar_per_sub = DEFAULT_N_BUSBAR_PER_SUB,
-                 connect_all_elements_to_first_bus = False,
+                 detailed_infos_for_cascading_failures:bool=False,
+                 check_isolated_and_disconnected_injections:Optional[bool]=None,
+                 consider_open_branch_reactive_flow:bool = False,
+                 n_busbar_per_sub:int = DEFAULT_N_BUSBAR_PER_SUB,
+                 connect_all_elements_to_first_bus:bool = False,
                  lf_parameters: pp.loadflow.Parameters = None):
         Backend.__init__(self,
                          detailed_infos_for_cascading_failures=detailed_infos_for_cascading_failures,
-                         can_be_copied=True)
+                         can_be_copied=True,
+                         # save this kwargs (might be needed)
+                         check_isolated_and_disconnected_injections=check_isolated_and_disconnected_injections,
+                         consider_open_branch_reactive_flow=consider_open_branch_reactive_flow,
+                         connect_all_elements_to_first_bus=connect_all_elements_to_first_bus,
+                         lf_parameters=lf_parameters
+                         )
+        
         self._check_isolated_and_disconnected_injections = check_isolated_and_disconnected_injections
         self._consider_open_branch_reactive_flow = consider_open_branch_reactive_flow
         self.n_busbar_per_sub = n_busbar_per_sub
@@ -92,6 +100,11 @@ class PyPowSyBlBackend(Backend):
         if hasattr(cls, "can_handle_detachment"):
             # grid2op version >= 1.11.0 then we use this
             self.can_handle_detachment()
+            self.check_detachment_coherent()
+        else:
+            if self._check_isolated_and_disconnected_injections is None:
+                # default behaviour in grid2op before detachment is allowed
+                self._check_isolated_and_disconnected_injections = True
 
         # load network
         full_path = self.make_complete_path(path, filename)
@@ -110,6 +123,39 @@ class PyPowSyBlBackend(Backend):
         elapsed_time = (end_time - start_time) * 1000
         logger.info(f"Network '{network.id}' loaded in {elapsed_time:.2f} ms")
 
+    def check_detachment_coherent(self):
+        if self._check_isolated_and_disconnected_injections is None:
+            # user does not provide anything to the backend
+            if self.detachment_is_allowed:
+                self._check_isolated_and_disconnected_injections = False
+            else:
+                self._check_isolated_and_disconnected_injections = True
+        else:
+            # user provided something, I check if it's consistent
+            if self._check_isolated_and_disconnected_injections:
+                if self.detachment_is_allowed:
+                    msg_ = ("You initialized the pypowsybl backend with \"check_isolated_and_disconnected_injections=True\" "
+                            "and the environment with \"allow_detachment=True\" which is not consistent. "
+                            "Discarding the call to env.make, the detachement is NOT supported for this env. "
+                            "If you want to support detachment, either initialize the pypowsybl backend with "
+                            "\"check_isolated_and_disconnected_injections=False\" or (preferably) with "
+                            "\"check_isolated_and_disconnected_injections=None\"")
+                    warnings.warn(msg_)
+                    logger.warning(msg_)
+                    type(self).detachment_is_allowed = False
+                    self.detachment_is_allowed = False
+            else:
+                if not self.detachment_is_allowed:
+                    msg_ = ("You initialized the pypowsybl backend with \"check_isolated_and_disconnected_injections=False\" "
+                            "and the environment with \"allow_detachment=False\" which is not consistent. "
+                            "The setting of \"check_isolated_and_disconnected_injections=False\" will have no effect. "
+                            "Detachment will NOT be supported. If you want so, please consider initializing pypowsybl backend with "
+                            "\"check_isolated_and_disconnected_injections=True\" or (preferably) with "
+                            "\"check_isolated_and_disconnected_injections=None\"")
+                    warnings.warn(msg_)
+                    logger.warning(msg_)
+                
+            
     def load_grid_from_iidm(self, network: pp.network.Network) -> None:
         if self._grid:
             self._grid.close()
