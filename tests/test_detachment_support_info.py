@@ -47,7 +47,11 @@ def test_None_False():
         return
     try:
         assert not type(env.backend).detachment_is_allowed
+        assert env.backend._check_isolated_and_disconnected_injections
         assert not type(env).detachment_is_allowed
+        obs = env.reset()
+        obs, reward, done, info = env.step(env.action_space({'set_bus': {"loads_id": [(0, -1)]}}))
+        assert done
     finally:
         env.close()
         
@@ -59,7 +63,11 @@ def test_None_default():
         return
     try:
         assert not type(env.backend).detachment_is_allowed
+        assert env.backend._check_isolated_and_disconnected_injections
         assert not type(env).detachment_is_allowed
+        obs = env.reset()
+        obs, reward, done, info = env.step(env.action_space({'set_bus': {"loads_id": [(0, -1)]}}))
+        assert done
     finally:
         env.close()
         
@@ -71,7 +79,11 @@ def test_None_True():
         return
     try:
         assert type(env.backend).detachment_is_allowed
+        assert not env.backend._check_isolated_and_disconnected_injections
         assert type(env).detachment_is_allowed
+        obs = env.reset()
+        obs, reward, done, info = env.step(env.action_space({'set_bus': {"loads_id": [(0, -1)]}}))
+        assert not done
     finally:
         env.close()
 
@@ -83,7 +95,11 @@ def test_False_False():
         return
     try:
         assert not type(env.backend).detachment_is_allowed
+        assert not env.backend._check_isolated_and_disconnected_injections
         assert not type(env).detachment_is_allowed
+        obs = env.reset()
+        obs, reward, done, info = env.step(env.action_space({'set_bus': {"loads_id": [(0, -1)]}}))
+        assert done
     finally:
         env.close()
         
@@ -95,7 +111,11 @@ def test_False_default():
         return
     try:
         assert not type(env.backend).detachment_is_allowed
+        assert not env.backend._check_isolated_and_disconnected_injections
         assert not type(env).detachment_is_allowed
+        obs = env.reset()
+        obs, reward, done, info = env.step(env.action_space({'set_bus': {"loads_id": [(0, -1)]}}))
+        assert done
     finally:
         env.close()
         
@@ -107,7 +127,11 @@ def test_False_True():
         return
     try:
         assert type(env.backend).detachment_is_allowed
+        assert not env.backend._check_isolated_and_disconnected_injections
         assert type(env).detachment_is_allowed
+        obs = env.reset()
+        obs, reward, done, info = env.step(env.action_space({'set_bus': {"loads_id": [(0, -1)]}}))
+        assert not done
     finally:
         env.close()
 
@@ -119,7 +143,11 @@ def test_True_False():
         return
     try:
         assert not type(env.backend).detachment_is_allowed
+        assert env.backend._check_isolated_and_disconnected_injections
         assert not type(env).detachment_is_allowed
+        obs = env.reset()
+        obs, reward, done, info = env.step(env.action_space({'set_bus': {"loads_id": [(0, -1)]}}))
+        assert done
     finally:
         env.close()
         
@@ -131,7 +159,11 @@ def test_True_default():
         return
     try:
         assert not type(env.backend).detachment_is_allowed
+        assert env.backend._check_isolated_and_disconnected_injections
         assert not type(env).detachment_is_allowed
+        obs = env.reset()
+        obs, reward, done, info = env.step(env.action_space({'set_bus': {"loads_id": [(0, -1)]}}))
+        assert done
     finally:
         env.close()
         
@@ -143,6 +175,10 @@ def test_True_True():
         return
     try:
         assert not type(env.backend).detachment_is_allowed
+        assert env.backend._check_isolated_and_disconnected_injections
         assert not type(env).detachment_is_allowed
+        obs = env.reset()
+        obs, reward, done, info = env.step(env.action_space({'set_bus': {"loads_id": [(0, -1)]}}))
+        assert done
     finally:
         env.close()
