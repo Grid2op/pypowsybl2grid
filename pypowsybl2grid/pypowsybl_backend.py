@@ -170,8 +170,6 @@ class PyPowSyBlBackend(Backend):
         self.name_sub = self._grid.get_string_value(pp.grid2op.StringValueType.VOLTAGE_LEVEL_NAME)
         self.n_sub = len(self.name_sub)
 
-        self.can_handle_more_than_2_busbar()
-
         logger.info(f"{self.n_busbar_per_sub} busbars per substation")
 
         # loads
