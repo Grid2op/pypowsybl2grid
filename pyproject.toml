@@ -10,8 +10,9 @@ license = "MPL-2.0"
 [tool.poetry.dependencies]
 python = "^3.9"
 numpy = "1.26.4"
-pypowsybl = "^1.9.0"
-grid2op = "^1.10.5"
+pypowsybl = { path = "/home/jamgotchiangeo/PycharmProjects/pypowsybl/dist/pypowsybl-1.11.0.dev1-cp310-cp310-linux_x86_64.whl" }
+#pypowsybl = "1.9.0"
+grid2op = "1.11.0.dev4"
 sortedcontainers = "^2.4.0"
 
 [tool.poetry.group.test.dependencies]
