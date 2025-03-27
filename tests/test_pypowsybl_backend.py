@@ -6,6 +6,7 @@
 
 import logging
 import tempfile
+import uuid
 from typing import Dict
 
 import numpy as np
@@ -28,6 +29,8 @@ def setup():
 @pytest.fixture
 def backend():
     backend = create_backend()
+    # we need to set a different environment name for each test to avoid side effects
+    type(backend).set_env_name('backend_' + str(uuid.uuid4()))
     yield backend
     backend.close()
 

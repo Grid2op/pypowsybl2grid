@@ -2,14 +2,14 @@
 
 [[package]]
 name = "certifi"
-version = "2024.12.14"
+version = "2025.1.31"
 description = "Python package for providing Mozilla's CA Bundle."
 optional = false
 python-versions = ">=3.6"
 groups = ["main"]
 files = [
-    {file = "certifi-2024.12.14-py3-none-any.whl", hash = "sha256:1275f7a45be9464efc1173084eaa30f866fe2e47d389406136d332ed4967ec56"},
-    {file = "certifi-2024.12.14.tar.gz", hash = "sha256:b650d30f370c2b724812bee08008be0c4163b163ddaec3f2546c1caf65f191db"},
+    {file = "certifi-2025.1.31-py3-none-any.whl", hash = "sha256:ca78db4565a652026a4db2bcdf68f2fb589ea80d0be70e03929ed730746b84fe"},
+    {file = "certifi-2025.1.31.tar.gz", hash = "sha256:3d5da6925056f6f18f119200434a4780a94263f10d1c21d032a6f6b2baa20651"},
 ]
 
 [[package]]
@@ -129,21 +129,21 @@ markers = {main = "platform_system == \"Windows\"", test = "sys_platform == \"wi
 
 [[package]]
 name = "deepdiff"
-version = "8.1.1"
+version = "8.4.2"
 description = "Deep Difference and Search of any Python object/data. Recreate objects by adding adding deltas to each other."
 optional = false
 python-versions = ">=3.8"
 groups = ["main"]
 files = [
-    {file = "deepdiff-8.1.1-py3-none-any.whl", hash = "sha256:b0231fa3afb0f7184e82535f2b4a36636442ed21e94a0cf3aaa7982157e7ebca"},
-    {file = "deepdiff-8.1.1.tar.gz", hash = "sha256:dd7bc7d5c8b51b5b90f01b0e2fe23c801fd8b4c6a7ee7e31c5a3c3663fcc7ceb"},
+    {file = "deepdiff-8.4.2-py3-none-any.whl", hash = "sha256:7e39e5b26f3747c54f9d0e8b9b29daab670c3100166b77cc0185d5793121b099"},
+    {file = "deepdiff-8.4.2.tar.gz", hash = "sha256:5c741c0867ebc7fcb83950ad5ed958369c17f424e14dee32a11c56073f4ee92a"},
 ]
 
 [package.dependencies]
-orderly-set = ">=5.2.3,<6"
+orderly-set = ">=5.3.0,<6"
 
 [package.extras]
-cli = ["click (==8.1.7)", "pyyaml (==6.0.2)"]
+cli = ["click (==8.1.8)", "pyyaml (==6.0.2)"]
 optimize = ["orjson"]
 
 [[package]]
@@ -164,14 +164,14 @@ test = ["pytest (>=6)"]
 
 [[package]]
 name = "grid2op"
-version = "1.11.0.dev4"
+version = "1.11.0.dev5"
 description = "An gymnasium compatible environment to model sequential decision making for powersystems"
 optional = false
 python-versions = ">=3.8"
 groups = ["main"]
 files = [
-    {file = "grid2op-1.11.0.dev4-py3-none-any.whl", hash = "sha256:cc3171035f4bf11383908f9eb8e5829d1ebe803f3b81cbf767eba2cd7f43725d"},
-    {file = "grid2op-1.11.0.dev4.tar.gz", hash = "sha256:60744c37811f95bbe822f2fb154d082dc3b027af9d93cdc457f58304398558d3"},
+    {file = "grid2op-1.11.0.dev5-py3-none-any.whl", hash = "sha256:0d698e3d25f0e870f629e2185147b99a767e13e9955550f905672724fe5a17f1"},
+    {file = "grid2op-1.11.0.dev5.tar.gz", hash = "sha256:3e3fd70f0fed81581d4b7e3ed9d034fe6d997e9aa12066375de0029815c4b35c"},
 ]
 
 [package.dependencies]
@@ -361,14 +361,14 @@ files = [
 
 [[package]]
 name = "orderly-set"
-version = "5.2.3"
+version = "5.3.0"
 description = "Orderly set"
 optional = false
 python-versions = ">=3.8"
 groups = ["main"]
 files = [
-    {file = "orderly_set-5.2.3-py3-none-any.whl", hash = "sha256:d357cedcf67f4ebff0d4cbd5b0997e98eeb65dd24fdf5c990a501ae9e82c7d34"},
-    {file = "orderly_set-5.2.3.tar.gz", hash = "sha256:571ed97c5a5fca7ddeb6b2d26c19aca896b0ed91f334d9c109edd2f265fb3017"},
+    {file = "orderly_set-5.3.0-py3-none-any.whl", hash = "sha256:c2c0bfe604f5d3d9b24e8262a06feb612594f37aa3845650548befd7772945d1"},
+    {file = "orderly_set-5.3.0.tar.gz", hash = "sha256:80b3d8fdd3d39004d9aad389eaa0eab02c71f0a0511ba3a6d54a935a6c6a0acc"},
 ]
 
 [[package]]
@@ -818,4 +818,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.9"
-content-hash = "43d894c7d277841e1c10183d81628d78af069787f84af29401c0d13db89a5cd3"
+content-hash = "3f0293b4af55d78a257602ce72c06ba098ce7e96003481f2bab7961e148bc7a9"
