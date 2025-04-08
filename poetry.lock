@@ -536,13 +536,32 @@ tests = ["pytest", "pytest-cov", "pytest-lazy-fixtures"]
 
 [[package]]
 name = "pypowsybl"
-version = "1.11.0.dev1"
+version = "1.11.0"
 description = "A PowSyBl Python API"
 optional = false
 python-versions = ">=3.8"
 groups = ["main"]
 files = [
-    {file = "pypowsybl-1.11.0.dev1-cp310-cp310-linux_x86_64.whl", hash = "sha256:5b4bab75c14593a7592536b815d0e83119b5ecc843ac08324d224c0ab8903262"},
+    {file = "pypowsybl-1.11.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:ac9c6c899488fd471cef7534955331979e40409d796e03f7c323676239405639"},
+    {file = "pypowsybl-1.11.0-cp310-cp310-macosx_11_0_x86_64.whl", hash = "sha256:22a3c13f8a87dcfc830959dc26004088ed41fac69e7a796337e1e920afc56911"},
+    {file = "pypowsybl-1.11.0-cp310-cp310-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:6f64d11c1c3e499e8fb3e9d169c9a715b7e4025b46e47c9f9377c86488a88a85"},
+    {file = "pypowsybl-1.11.0-cp310-cp310-win_amd64.whl", hash = "sha256:f4aa466f4b75131a8d783dd19a761215de55d3c801379246bb04ae15fb75bf88"},
+    {file = "pypowsybl-1.11.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:19a264d86b9fc653a13079ac5aa3bea59d17f98f886df5700f58aaf96ee62869"},
+    {file = "pypowsybl-1.11.0-cp311-cp311-macosx_11_0_x86_64.whl", hash = "sha256:4aeb342471030d60336ffc1f6ed09cdfc57e2ebb6f87e3add68fb1c40e66fb28"},
+    {file = "pypowsybl-1.11.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:961a619657f291b0e545b5111fc5db6909e2e15ba8477a1a6563d2c02d8e3d6b"},
+    {file = "pypowsybl-1.11.0-cp311-cp311-win_amd64.whl", hash = "sha256:ca1d51f154101c1ba6010bf9e3ce212080b8c92f5bc84770eec82cdc998572b1"},
+    {file = "pypowsybl-1.11.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:7900fd76132ac551ec2aad7ffcf123a32c944202cee3273122fdb764ba736be4"},
+    {file = "pypowsybl-1.11.0-cp312-cp312-macosx_11_0_x86_64.whl", hash = "sha256:cd64af830e48a333868fdfe188e8390ee2fd5b364aedda04d03fcde2dcdeac8e"},
+    {file = "pypowsybl-1.11.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:997340b0b19572c889e4c15c41c78e8d257c508e49ac534e813e7d8f14e813c5"},
+    {file = "pypowsybl-1.11.0-cp312-cp312-win_amd64.whl", hash = "sha256:cc3bae0bf99b865af78540913f54f8c49ca32be378a7cfe78fa4c099d3bc0e1e"},
+    {file = "pypowsybl-1.11.0-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:f9a0f664b2ae5b2e318363284768d3ff21204f97e13e76140361fd8ff959de4b"},
+    {file = "pypowsybl-1.11.0-cp38-cp38-macosx_11_0_x86_64.whl", hash = "sha256:10674d33064ab32b379002ddc90ffc9e10f3de9151cd5daee4a5eb14e58203e9"},
+    {file = "pypowsybl-1.11.0-cp38-cp38-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:e2818e825e0b7e59b221ee127bb7b35ca109daf582fa0a86c8af00652154a1a2"},
+    {file = "pypowsybl-1.11.0-cp38-cp38-win_amd64.whl", hash = "sha256:61ef87cbe0c95e9a726ccbd4911a3818b5eb009d7439e330298b0243da6536c0"},
+    {file = "pypowsybl-1.11.0-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:918c0a619132b694a0447f93a89adbcaff88a37d9bdcb2ccbdef7cf0f186c9d7"},
+    {file = "pypowsybl-1.11.0-cp39-cp39-macosx_11_0_x86_64.whl", hash = "sha256:ebcc534519cf4d68394dbe321ae35793f57a7e743aabb32c04b1488b4a4cf159"},
+    {file = "pypowsybl-1.11.0-cp39-cp39-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:3408db4729b64cabf9b8d3c4b513e173108448023538a9ca6863126b5595644d"},
+    {file = "pypowsybl-1.11.0-cp39-cp39-win_amd64.whl", hash = "sha256:7fecdae69f704c09e7dd6bd185fdfb28a40e3a9a76795d79a53f46dfc2f14c01"},
 ]
 
 [package.dependencies]
@@ -552,10 +571,6 @@ prettytable = ">=2.0.0"
 
 [package.extras]
 pandapower = ["pandapower (>=2.4.11)"]
-
-[package.source]
-type = "file"
-url = "../pypowsybl/dist/pypowsybl-1.11.0.dev1-cp310-cp310-linux_x86_64.whl"
 
 [[package]]
 name = "pytest"
@@ -818,4 +833,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.9"
-content-hash = "3f0293b4af55d78a257602ce72c06ba098ce7e96003481f2bab7961e148bc7a9"
+content-hash = "d444953e2ee87ad4605dc01d566a249cdd8fcc1dcb12cd80ff804bfe4cff013c"
