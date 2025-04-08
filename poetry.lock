@@ -164,21 +164,21 @@ test = ["pytest (>=6)"]
 
 [[package]]
 name = "grid2op"
-version = "1.11.0.dev5"
+version = "1.10.5"
 description = "An gymnasium compatible environment to model sequential decision making for powersystems"
 optional = false
 python-versions = ">=3.8"
 groups = ["main"]
 files = [
-    {file = "grid2op-1.11.0.dev5-py3-none-any.whl", hash = "sha256:0d698e3d25f0e870f629e2185147b99a767e13e9955550f905672724fe5a17f1"},
-    {file = "grid2op-1.11.0.dev5.tar.gz", hash = "sha256:3e3fd70f0fed81581d4b7e3ed9d034fe6d997e9aa12066375de0029815c4b35c"},
+    {file = "Grid2Op-1.10.5-py3-none-any.whl", hash = "sha256:421d96ad3ba88e6e2ca9c441d672eb279a65fdaab5438688f0a39d7fa0c48597"},
+    {file = "grid2op-1.10.5.tar.gz", hash = "sha256:d9bfedd4cc5efc7e8678c53f53fbcd3e62fcf2fb359ceb0b06313a2f2ef5da70"},
 ]
 
 [package.dependencies]
 networkx = ">=2.4"
 numpy = "*"
 packaging = "*"
-pandapower = ">=2.2.2,<3"
+pandapower = ">=2.2.2"
 pandas = ">=1.0.3"
 requests = ">=2.23.0"
 scipy = ">=1.4.1"
@@ -833,4 +833,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.9"
-content-hash = "d444953e2ee87ad4605dc01d566a249cdd8fcc1dcb12cd80ff804bfe4cff013c"
+content-hash = "9fa65562794d784e7d2a0d5058390ce7d18daafecff0fa035bd3cf393aba4ea5"

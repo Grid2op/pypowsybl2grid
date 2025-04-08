@@ -11,8 +11,8 @@ license = "MPL-2.0"
 python = "^3.9"
 numpy = "1.26.4"
 pypowsybl = "1.11.0"
+grid2op = "^1.10.5"
 sortedcontainers = "^2.4.0"
-grid2op = "1.11.0.dev5"
 
 [tool.poetry.group.test.dependencies]
 pytest = "^8.3.3"
