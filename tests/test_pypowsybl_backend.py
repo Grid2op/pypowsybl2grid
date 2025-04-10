@@ -6,6 +6,7 @@
 
 import logging
 import tempfile
+import uuid
 from typing import Dict
 
 import numpy as np
@@ -28,6 +29,8 @@ def setup():
 @pytest.fixture
 def backend():
     backend = create_backend()
+    # we need to set a different environment name for each test to avoid side effects
+    type(backend).set_env_name('backend_' + str(uuid.uuid4()))
     yield backend
     backend.close()
 
@@ -307,3 +310,36 @@ def test_backend_copy(backend):
     backend_cpy = backend.copy()
     assert isinstance(backend_cpy, type(backend))
     backend_cpy.close()
+
+
+def test_gen_detachment(backend):
+    n = pp.network.create_ieee14()
+    load_grid(backend, n)
+
+    assert [1] * 56 == backend.get_topo_vect().tolist()
+
+    conv, _ = backend.runpf()
+    assert conv
+
+    apply_action(backend, {'set_line_status': {'L7-8-1': -1}})
+    backend.fetch_data()
+
+    conv, _ = backend.runpf()
+    assert conv
+
+    assert [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, -1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, -1, -1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1] == backend.get_topo_vect().tolist()
+
+
+def test_backend_with_theta(backend):
+    n = pp.network.create_eurostag_tutorial_example1_network()
+    load_grid(backend, n)
+
+    conv, _ = backend.runpf()
+    assert conv
+
+    assert (np.array([ 0.0, 0.0, 0.04059613, -0.06119749]),
+            np.array([-0.06119749, -0.06119749, 0.0, -0.16780443]),
+            np.array([-0.16780443]),
+            np.array([0.04059613, 0.04059613]),
+            np.array([]))
