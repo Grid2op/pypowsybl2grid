@@ -53,6 +53,8 @@ class PyPowSyBlBackend(Backend):
         else:
             self._lf_parameters = lf_parameters
 
+        self.can_output_theta = True
+
         self.shunts_data_available = True
         self.supported_grid_format = pp.network.get_import_supported_extensions()
 
@@ -81,6 +83,11 @@ class PyPowSyBlBackend(Backend):
         self._shunt_q = None
         self._shunt_v = None
         self._shunt_bus = None
+
+        self._gen_theta = None
+        self._load_theta = None
+        self._line_or_theta = None
+        self._line_ex_theta = None
 
         self._topo_vect = None
 
@@ -163,6 +170,7 @@ class PyPowSyBlBackend(Backend):
 
         self._grid = pp.grid2op.Backend(network,
                                         self._consider_open_branch_reactive_flow,
+                                        self._check_isolated_and_disconnected_injections,
                                         self.n_busbar_per_sub,
                                         self._connect_all_elements_to_first_bus)
 
@@ -189,6 +197,7 @@ class PyPowSyBlBackend(Backend):
 
         # batteries
         self.set_no_storage()
+        self.n_storage = 0
         # FIXME implement batteries
         # self.name_storage = np.array(self._grid.get_string_value(pp.grid2op.StringValueType.BATTERY_NAME))
         # self.n_storage = len(self.name_storage)
@@ -229,6 +238,12 @@ class PyPowSyBlBackend(Backend):
         self._shunt_q = np.empty(self.n_shunt, dtype=dt_float)
         self._shunt_v = np.empty(self.n_shunt, dtype=dt_float)
         self._shunt_bus = np.empty(self.n_shunt, dtype=dt_int)
+
+        self._gen_theta = np.empty(self.n_gen, dtype=dt_float)
+        self._load_theta = np.empty(self.n_load, dtype=dt_float)
+        self._line_or_theta = np.empty(self.n_line, dtype=dt_float)
+        self._line_ex_theta = np.empty(self.n_line, dtype=dt_float)
+        self._storage_theta = np.empty(self.n_storage, dtype=dt_float)
 
         self._topo_vect = np.empty(self.dim_topo, dtype=dt_int)
         self.fetch_data()
@@ -323,6 +338,12 @@ class PyPowSyBlBackend(Backend):
         self._shunt_v[:] = np.nan
         self._shunt_bus[:] = -1
 
+        self._gen_theta[:] = np.nan
+        self._load_theta[:] = np.nan
+        self._line_or_theta[:] = np.nan
+        self._line_ex_theta[:] = np.nan
+        self._storage_theta[:] = np.nan
+
         self._topo_vect[:] = -1
 
     def get_topo_vect(self)-> np.ndarray:
@@ -338,6 +359,7 @@ class PyPowSyBlBackend(Backend):
         self._gen_p = self._grid.get_double_value(pp.grid2op.DoubleValueType.GENERATOR_P)
         self._gen_q = self._grid.get_double_value(pp.grid2op.DoubleValueType.GENERATOR_Q)
         self._gen_v = self._grid.get_double_value(pp.grid2op.DoubleValueType.GENERATOR_V)
+        self._gen_theta = self._grid.get_double_value(pp.grid2op.DoubleValueType.GENERATOR_ANGLE)
 
     def loads_info(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         return 1. * self._load_p, 1.* self._load_q, 1. * self._load_v
@@ -346,6 +368,7 @@ class PyPowSyBlBackend(Backend):
         self._load_p[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.LOAD_P)
         self._load_q[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.LOAD_Q)
         self._load_v[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.LOAD_V)
+        self._load_theta[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.LOAD_ANGLE)
 
     def shunt_info(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         return 1. * self._shunt_p, 1. * self._shunt_q, 1. * self._shunt_v, 1 * self._shunt_bus
@@ -364,6 +387,7 @@ class PyPowSyBlBackend(Backend):
         self._qor[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.BRANCH_Q1)
         self._vor[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.BRANCH_V1)
         self._aor[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.BRANCH_I1)
+        self._line_or_theta[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.BRANCH_ANGLE1)
 
     def lines_ex_info(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         return 1. * self._pex, 1. * self._qex, 1. * self._vex, 1. * self._aex
@@ -373,6 +397,14 @@ class PyPowSyBlBackend(Backend):
         self._qex[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.BRANCH_Q2)
         self._vex[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.BRANCH_V2)
         self._aex[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.BRANCH_I2)
+        self._line_ex_theta[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.BRANCH_ANGLE2)
+
+    def get_theta(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        return 1. * self._line_or_theta, \
+               1. * self._line_ex_theta, \
+               1. * self._load_theta, \
+               1. * self._gen_theta, \
+               1. * self._storage_theta
 
     def reset(self,
               path : Union[os.PathLike, str],

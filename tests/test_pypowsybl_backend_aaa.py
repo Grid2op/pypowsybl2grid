@@ -30,5 +30,6 @@ def setup():
 class TestBackendPyPowSyBl(AAATestBackendAPI, unittest.TestCase):
 
     def make_backend(self, detailed_infos_for_cascading_failures=False):
+        self.tests_skipped = ["test_18_isolated_shunt_stops_computation"] # waiting for shunt detachment support in AAA test
         self.tol_one = dt_float(1e-3)
         return PyPowSyBlBackend(detailed_infos_for_cascading_failures=detailed_infos_for_cascading_failures, lf_parameters=TEST_LOADFLOW_PARAMETERS)
