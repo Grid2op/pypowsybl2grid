@@ -37,7 +37,7 @@ class PyPowSyBlBackend(Backend):
                  lf_parameters: pp.loadflow.Parameters = None):
         Backend.__init__(self,
                          detailed_infos_for_cascading_failures=detailed_infos_for_cascading_failures,
-                         can_be_copied=Trucan_be_copiede,
+                         can_be_copied=can_be_copied,
                          # save this kwargs (might be needed)
                          check_isolated_and_disconnected_injections=check_isolated_and_disconnected_injections,
                          consider_open_branch_reactive_flow=consider_open_branch_reactive_flow,
