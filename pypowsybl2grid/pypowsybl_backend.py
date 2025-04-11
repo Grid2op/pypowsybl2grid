@@ -29,6 +29,7 @@ class PyPowSyBlBackend(Backend):
 
     def __init__(self,
                  detailed_infos_for_cascading_failures:bool=False,
+                 can_be_copied:bool=True,
                  check_isolated_and_disconnected_injections:Optional[bool]=None,
                  consider_open_branch_reactive_flow:bool = False,
                  n_busbar_per_sub:int = DEFAULT_N_BUSBAR_PER_SUB,
@@ -36,7 +37,7 @@ class PyPowSyBlBackend(Backend):
                  lf_parameters: pp.loadflow.Parameters = None):
         Backend.__init__(self,
                          detailed_infos_for_cascading_failures=detailed_infos_for_cascading_failures,
-                         can_be_copied=True,
+                         can_be_copied=can_be_copied,
                          # save this kwargs (might be needed)
                          check_isolated_and_disconnected_injections=check_isolated_and_disconnected_injections,
                          consider_open_branch_reactive_flow=consider_open_branch_reactive_flow,
