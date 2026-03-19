@@ -4,11 +4,12 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 # SPDX-License-Identifier: MPL-2.0
 
+from importlib.metadata import version
+
 from .pypowsybl_backend import PyPowSyBlBackend
 from .util import write_obs_json
 
-__version__ = "0.3.1"
-
+__version__ = version("pypowsybl2grid")
 __all__ = [
     "PyPowSyBlBackend",
     "write_obs_json",

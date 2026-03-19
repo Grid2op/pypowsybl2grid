@@ -1,6 +1,6 @@
 [project]
 name = "pypowsybl2grid"
-dynamic = ["version"]
+version = "0.3.1"
 description = "An integration between Grid2op and PyPowSybl"
 authors = [
     { name = "Geoffroy Jamgotchian", email = "geoffroy.jamgotchian@rte-france.com" },
@@ -30,7 +30,3 @@ pypowsybl = ["pypowsybl>=1.11.0,<1.15.0"]
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
-
-
-[tool.hatch.version]
-path = "pypowsybl2grid/__init__.py"
