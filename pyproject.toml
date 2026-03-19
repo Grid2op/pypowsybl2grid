@@ -11,12 +11,18 @@ license = { text = "MPL-2.0" }
 requires-python = ">=3.9"
 dependencies = [
     "numpy==1.26.4",
-    "pypowsybl>=1.11.0,<=1.12.0",
+    "pypowsybl==1.12.0",
     "grid2op>=1.10.5,<=1.12.2",
     "sortedcontainers>=2.4.0",
 ]
 [dependency-groups]
-dev = ["pytest>=8.3.3", "mypy>=1.11.2"]
+dev = [
+    "pytest>=8.3.3",
+    "mypy>=1.11.2",
+    "ruff>=0.1.0",
+    "isort>=5.12.0",
+    "prek>=0.3.6",
+]
 
 [project.optional-dependencies]
 test = ["pytest>=8.3.3", "mypy>=1.11.2"]
