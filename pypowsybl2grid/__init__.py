@@ -6,3 +6,10 @@
 
 from .pypowsybl_backend import PyPowSyBlBackend
 from .util import write_obs_json
+
+__version__ = "0.3.1"
+
+__all__ = [
+    "PyPowSyBlBackend",
+    "write_obs_json",
+]

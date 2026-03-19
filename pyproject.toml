@@ -1,23 +1,26 @@
-[tool.poetry]
+[project]
 name = "pypowsybl2grid"
 version = "0.3.0"
 description = "An integration between Grid2op and PyPowSybl"
-authors = ["Geoffroy Jamgotchian <geoffroy.jamgotchian@rte-france.com>",
-           "Benjamin Donnot <benjamin.donnot@rte-france.com>"]
+authors = [
+    { name = "Geoffroy Jamgotchian", email = "geoffroy.jamgotchian@rte-france.com" },
+    { name = "Benjamin Donnot", email = "benjamin.donnot@rte-france.com" },
+]
 readme = "README.md"
-license = "MPL-2.0"
+license = { text = "MPL-2.0" }
+requires-python = ">=3.9"
+dependencies = [
+    "numpy==1.26.4",
+    "pypowsybl>=1.11.0,<=1.12.0",
+    "grid2op>=1.10.5,<=1.12.2",
+    "sortedcontainers>=2.4.0",
+]
+[dependency-groups]
+dev = ["pytest>=8.3.3", "mypy>=1.11.2"]
 
-[tool.poetry.dependencies]
-python = "^3.9"
-numpy = "1.26.4"
-pypowsybl = "^1.11.0"
-grid2op = "^1.10.5"
-sortedcontainers = "^2.4.0"
-
-[tool.poetry.group.test.dependencies]
-pytest = "^8.3.3"
-mypy = "^1.11.2"
+[project.optional-dependencies]
+test = ["pytest>=8.3.3", "mypy>=1.11.2"]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
