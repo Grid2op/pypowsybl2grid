@@ -26,17 +26,30 @@ def setup():
 def test_can_load_2_envs():
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore")
+
+        # Ralf Cortes : fixing test for pypowsybl >=1.13
+        # The default behaviour of open load flow changed from leave slack on bus to fail
+        lf_params = pp.loadflow.Parameters(
+            voltage_init_mode=pp.loadflow.VoltageInitMode.DC_VALUES,
+            provider_parameters={
+                "slackDistributionFailureBehavior": "LEAVE_ON_SLACK_BUS"
+            },
+        )
+
         env1 = grid2op.make(
-            "l2rpn_case14_sandbox", test=True, backend=PyPowSyBlBackend()
+            "l2rpn_case14_sandbox",
+            test=True,
+            backend=PyPowSyBlBackend(lf_parameters=lf_params),
         )
         env2 = grid2op.make(
             "l2rpn_neurips_2020_track2",
             test=True,
-            backend=PyPowSyBlBackend(),
+            backend=PyPowSyBlBackend(lf_parameters=lf_params),
             chronics_class=ChangeNothing,
         )
     obs1 = env1.reset(seed=0, options={"time serie id": 0})
     assert abs(obs1.a_or.sum() - 4973.0478515625) <= 1e-6
+
     obs2 = env2.reset(seed=0, options={"time serie id": 0})
     assert abs(obs2.a_or.sum() - 23059.88671875) <= 1e-6
 
@@ -68,17 +81,14 @@ def test_can_load_attached_env_nochron_noopp():
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore")
 
-            # Ralf Cortes : fixing test for pypowsybl 1.13
+            # Ralf Cortes : fixing test for pypowsybl >=1.13
             # The default behaviour of open load flow changed from leave slack on bus to fail
-            if el_nm == "educ_case14_redisp":
-                lf_params = pp.loadflow.Parameters(
-                    voltage_init_mode=pp.loadflow.VoltageInitMode.DC_VALUES,
-                    provider_parameters={
-                        "slackDistributionFailureBehavior": "LEAVE_ON_SLACK_BUS"
-                    },
-                )
-            else:
-                lf_params = None
+            lf_params = pp.loadflow.Parameters(
+                voltage_init_mode=pp.loadflow.VoltageInitMode.DC_VALUES,
+                provider_parameters={
+                    "slackDistributionFailureBehavior": "LEAVE_ON_SLACK_BUS"
+                },
+            )
 
             env = grid2op.make(
                 el_nm,
