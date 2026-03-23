@@ -4,7 +4,6 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 # SPDX-License-Identifier: MPL-2.0
 
-import logging
 import os
 import time
 import warnings
@@ -12,6 +11,7 @@ from typing import Optional, Tuple, Union
 
 import numpy as np
 import pandapower as pdp
+import structlog
 from grid2op.Action._backendAction import _BackendAction
 from grid2op.Backend import Backend
 from grid2op.dtypes import dt_float, dt_int
@@ -34,7 +34,14 @@ from pypowsybl.network.impl.network_creation_util import load
 from pypowsybl.network.impl.pandapower_converter import convert_from_pandapower
 from pypowsybl.network.impl.util import get_import_supported_extensions
 
-logger = logging.getLogger(__name__)
+from pypowsybl2grid.models import (
+    PhaseTapChangerUpdate,
+    PhaseTapChangerUpdatePayload,
+    RatioTapChangerUpdate,
+    RatioTapChangerUpdatePayload,
+)
+
+logger = structlog.get_logger()
 
 DEFAULT_LF_PARAMETERS = Parameters(voltage_init_mode=VoltageInitMode.DC_VALUES)
 
@@ -79,6 +86,8 @@ class PyPowSyBlBackend(Backend):
         self.supported_grid_format = get_import_supported_extensions()  # pyright: ignore[reportAttributeAccessIssue]
 
         self._grid = None
+        self._phase_tap_changers_to_use_in_network: PhaseTapChangerUpdatePayload | None = None
+        self._ratio_tap_changers_to_use_in_network: RatioTapChangerUpdatePayload | None = None
 
         # caching of the results
         self._gen_p: np.ndarray = np.empty(0, dtype=dt_float)
@@ -111,6 +120,67 @@ class PyPowSyBlBackend(Backend):
         self._storage_theta: np.ndarray = np.empty(0, dtype=dt_float)
 
         self._topo_vect: np.ndarray = np.empty(0, dtype=dt_int)
+
+    @property
+    def ratio_tap_changers_to_use_in_network(self) -> RatioTapChangerUpdatePayload | None:
+        """Ratio tap changers (classic transformers) to apply when loading the network."""
+        return self._ratio_tap_changers_to_use_in_network
+
+    @ratio_tap_changers_to_use_in_network.setter
+    def ratio_tap_changers_to_use_in_network(
+        self, value: RatioTapChangerUpdatePayload
+    ) -> None:
+        self._ratio_tap_changers_to_use_in_network = value
+
+    @property
+    def phase_tap_changers_to_use_in_network(self) -> PhaseTapChangerUpdatePayload | None:
+        """Phase tap changers (phase-shifting transformers) to apply when loading the network."""
+        return self._phase_tap_changers_to_use_in_network
+
+    @phase_tap_changers_to_use_in_network.setter
+    def phase_tap_changers_to_use_in_network(
+        self, value: PhaseTapChangerUpdatePayload
+    ) -> None:
+        self._phase_tap_changers_to_use_in_network = value
+
+    def init_tap_changers_from_network(self, network: Network) -> None:
+        """Initialise both tap changer properties from the current taps in the given network."""
+        self.phase_tap_changers_to_use_in_network = PhaseTapChangerUpdatePayload(
+            updates=[
+                PhaseTapChangerUpdate(id=str(i), tap=int(row["tap"]))
+                for i, row in network.get_phase_tap_changers().iterrows()
+            ]
+        )
+        self.ratio_tap_changers_to_use_in_network = RatioTapChangerUpdatePayload(
+            updates=[
+                RatioTapChangerUpdate(id=str(i), tap=int(row["tap"]))
+                for i, row in network.get_ratio_tap_changers().iterrows()
+            ]
+        )
+
+    def _update_backend_network_taps_with_taps_to_use_in_network(self) -> None:
+        """
+        This should update the grid2op backend held Network with the
+        data store in self.taps_to_use_in_network.
+        """
+        if (
+            not self.phase_tap_changers_to_use_in_network
+            or not self.ratio_tap_changers_to_use_in_network
+        ):
+            raise ValueError(
+                "You should set self.phase_tap_changers_to_use_in_network and self.ratio_tap_changers_to_use_in_network"
+            )
+        if self.network:
+            self.network.update_phase_tap_changers(
+                df=self.phase_tap_changers_to_use_in_network.to_df()
+            )
+            self.network.update_ratio_tap_changers(
+                df=self.ratio_tap_changers_to_use_in_network.to_df()
+            )
+        else:
+            raise ValueError(
+                "self.network is None, you should have a self.network before trying to update taps on it."
+            )
 
     @property
     def network(self) -> Network | None:
@@ -194,6 +264,59 @@ class PyPowSyBlBackend(Backend):
             self._grid.close()
             self._grid = None
 
+        current_ratio_tap_changers, current_phase_tap_changers = (
+            network.get_ratio_tap_changers(),
+            network.get_phase_tap_changers(),
+        )
+
+        n_phase = len(current_phase_tap_changers)
+        if self.phase_tap_changers_to_use_in_network:
+            phase_overrides = {
+                update.id: update.model_dump(exclude_none=True, exclude={"id"})
+                for update in self.phase_tap_changers_to_use_in_network.updates
+            }
+            n_phase_overridden = sum(1 for i, _ in current_phase_tap_changers.iterrows() if str(i) in phase_overrides)
+            logger.info(
+                f"Phase tap changers: {n_phase_overridden}/{n_phase} taps overridden via property"
+                + (f" ({100 * n_phase_overridden // n_phase}%)" if n_phase else "")
+            )
+        else:
+            phase_overrides = {}
+            logger.info(f"Phase tap changers: property not set, using all {n_phase} taps from network")
+        self.phase_tap_changers_to_use_in_network = PhaseTapChangerUpdatePayload(
+            updates=[
+                PhaseTapChangerUpdate(
+                    id=str(i),
+                    **{**{k: row[k] for k in PhaseTapChangerUpdate.model_fields if k != "id" and k in row.index}, **phase_overrides.get(str(i), {})},
+                )
+                for i, row in current_phase_tap_changers.iterrows()
+            ]
+        )
+
+        n_ratio = len(current_ratio_tap_changers)
+        if self.ratio_tap_changers_to_use_in_network:
+            ratio_overrides = {
+                update.id: update.model_dump(exclude_none=True, exclude={"id"})
+                for update in self.ratio_tap_changers_to_use_in_network.updates
+            }
+            n_ratio_overridden = sum(1 for i, _ in current_ratio_tap_changers.iterrows() if str(i) in ratio_overrides)
+            logger.info(
+                f"Ratio tap changers: {n_ratio_overridden}/{n_ratio} taps overridden via property"
+                + (f" ({100 * n_ratio_overridden // n_ratio}%)" if n_ratio else "")
+            )
+        else:
+            ratio_overrides = {}
+            logger.info(f"Ratio tap changers: property not set, using all {n_ratio} taps from network")
+        self.ratio_tap_changers_to_use_in_network = RatioTapChangerUpdatePayload(
+            updates=[
+                RatioTapChangerUpdate(
+                    id=str(i),
+                    **{**{k: row[k] for k in RatioTapChangerUpdate.model_fields if k != "id" and k in row.index}, **ratio_overrides.get(str(i), {})},
+                )
+                for i, row in current_ratio_tap_changers.iterrows()
+            ]
+        )
+
         self._grid = PPBackend(
             network,
             self._consider_open_branch_reactive_flow,
@@ -201,6 +324,8 @@ class PyPowSyBlBackend(Backend):
             self.n_busbar_per_sub,
             self._connect_all_elements_to_first_bus,
         )
+
+        self._update_backend_network_taps_with_taps_to_use_in_network()
 
         # substations mapped to IIDM voltage levels
         self.name_sub = self._grid.get_string_value(  # pyright: ignore[reportAttributeAccessIssue]
