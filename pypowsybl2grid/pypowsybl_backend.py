@@ -275,11 +275,14 @@ class PyPowSyBlBackend(Backend):
                 update.id: update.model_dump(exclude_none=True, exclude={"id"})
                 for update in self.phase_tap_changers_to_use_in_network.updates
             }
-            n_phase_overridden = sum(1 for i, _ in current_phase_tap_changers.iterrows() if str(i) in phase_overrides)
+            phase_unchanged = [str(i) for i, _ in current_phase_tap_changers.iterrows() if str(i) not in phase_overrides]
+            n_phase_overridden = n_phase - len(phase_unchanged)
             logger.info(
                 f"Phase tap changers: {n_phase_overridden}/{n_phase} taps overridden via property"
                 + (f" ({100 * n_phase_overridden // n_phase}%)" if n_phase else "")
             )
+            if phase_unchanged:
+                logger.info(f"Phase tap changers unchanged (using network values): {phase_unchanged}")
         else:
             phase_overrides = {}
             logger.info(f"Phase tap changers: property not set, using all {n_phase} taps from network")
@@ -299,11 +302,14 @@ class PyPowSyBlBackend(Backend):
                 update.id: update.model_dump(exclude_none=True, exclude={"id"})
                 for update in self.ratio_tap_changers_to_use_in_network.updates
             }
-            n_ratio_overridden = sum(1 for i, _ in current_ratio_tap_changers.iterrows() if str(i) in ratio_overrides)
+            ratio_unchanged = [str(i) for i, _ in current_ratio_tap_changers.iterrows() if str(i) not in ratio_overrides]
+            n_ratio_overridden = n_ratio - len(ratio_unchanged)
             logger.info(
                 f"Ratio tap changers: {n_ratio_overridden}/{n_ratio} taps overridden via property"
                 + (f" ({100 * n_ratio_overridden // n_ratio}%)" if n_ratio else "")
             )
+            if ratio_unchanged:
+                logger.info(f"Ratio tap changers unchanged (using network values): {ratio_unchanged}")
         else:
             ratio_overrides = {}
             logger.info(f"Ratio tap changers: property not set, using all {n_ratio} taps from network")
