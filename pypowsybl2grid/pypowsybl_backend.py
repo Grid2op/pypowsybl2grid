@@ -198,10 +198,16 @@ class PyPowSyBlBackend(Backend):
             )
         if self.network:
             self.network.update_phase_tap_changers(
-                df=self.phase_tap_changers_to_use_in_network.to_df()
+                df=self.phase_tap_changers_to_use_in_network.to_df()[0]
+            )
+            self.network.update_phase_tap_changers(
+                df=self.phase_tap_changers_to_use_in_network.to_df()[1]
             )
             self.network.update_ratio_tap_changers(
-                df=self.ratio_tap_changers_to_use_in_network.to_df()
+                df=self.ratio_tap_changers_to_use_in_network.to_df()[0]
+            )
+            self.network.update_ratio_tap_changers(
+                df=self.ratio_tap_changers_to_use_in_network.to_df()[1]
             )
         else:
             raise ValueError(
