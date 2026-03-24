@@ -26,24 +26,32 @@ class RatioTapChangerUpdate(BaseModel):
 class PhaseTapChangerUpdatePayload(BaseModel):
     updates: list[PhaseTapChangerUpdate]
 
-    def to_df(self) -> pd.DataFrame:
+    def to_df(self) -> tuple[pd.DataFrame, pd.DataFrame]:
         df = pd.DataFrame(
             [u.model_dump(exclude_none=True) for u in self.updates]
         ).set_index("id")
         if "regulating" in df.columns:
-                cols = [c for c in df.columns if c != "regulating"] + ["regulating"]
-                df = df[cols]
-        return df
+            other_cols = [c for c in df.columns if c != "regulating"]
+            df_enabling = df[df["regulating"]][other_cols + ["regulating"]]
+            df_disabling = df[~df["regulating"]][["regulating"] + other_cols]
+        else:
+            df_enabling = df.iloc[0:0]
+            df_disabling = df.iloc[0:0]
+        return df_enabling, df_disabling
 
 
 class RatioTapChangerUpdatePayload(BaseModel):
     updates: list[RatioTapChangerUpdate]
 
-    def to_df(self) -> pd.DataFrame:
+    def to_df(self) -> tuple[pd.DataFrame, pd.DataFrame]:
         df = pd.DataFrame(
             [u.model_dump(exclude_none=True) for u in self.updates]
         ).set_index("id")
         if "regulating" in df.columns:
-            cols = [c for c in df.columns if c != "regulating"] + ["regulating"]
-            df = df[cols]
-        return df
+            other_cols = [c for c in df.columns if c != "regulating"]
+            df_enabling = df[df["regulating"]][other_cols + ["regulating"]]
+            df_disabling = df[~df["regulating"]][["regulating"] + other_cols]
+        else:
+            df_enabling = df.iloc[0:0]
+            df_disabling = df.iloc[0:0]
+        return df_enabling, df_disabling
