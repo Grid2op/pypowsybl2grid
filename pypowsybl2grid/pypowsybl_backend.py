@@ -86,8 +86,12 @@ class PyPowSyBlBackend(Backend):
         self.supported_grid_format = get_import_supported_extensions()  # pyright: ignore[reportAttributeAccessIssue]
 
         self._grid = None
-        self._phase_tap_changers_to_use_in_network: PhaseTapChangerUpdatePayload | None = None
-        self._ratio_tap_changers_to_use_in_network: RatioTapChangerUpdatePayload | None = None
+        self._phase_tap_changers_to_use_in_network: (
+            PhaseTapChangerUpdatePayload | None
+        ) = None
+        self._ratio_tap_changers_to_use_in_network: (
+            RatioTapChangerUpdatePayload | None
+        ) = None
 
         # caching of the results
         self._gen_p: np.ndarray = np.empty(0, dtype=dt_float)
@@ -122,7 +126,9 @@ class PyPowSyBlBackend(Backend):
         self._topo_vect: np.ndarray = np.empty(0, dtype=dt_int)
 
     @property
-    def ratio_tap_changers_to_use_in_network(self) -> RatioTapChangerUpdatePayload | None:
+    def ratio_tap_changers_to_use_in_network(
+        self,
+    ) -> RatioTapChangerUpdatePayload | None:
         """Ratio tap changers (classic transformers) to apply when loading the network."""
         return self._ratio_tap_changers_to_use_in_network
 
@@ -133,7 +139,9 @@ class PyPowSyBlBackend(Backend):
         self._ratio_tap_changers_to_use_in_network = value
 
     @property
-    def phase_tap_changers_to_use_in_network(self) -> PhaseTapChangerUpdatePayload | None:
+    def phase_tap_changers_to_use_in_network(
+        self,
+    ) -> PhaseTapChangerUpdatePayload | None:
         """Phase tap changers (phase-shifting transformers) to apply when loading the network."""
         return self._phase_tap_changers_to_use_in_network
 
@@ -149,18 +157,30 @@ class PyPowSyBlBackend(Backend):
             updates=[
                 PhaseTapChangerUpdate(
                     id=str(i),
-                    **{k: row[k] for k in PhaseTapChangerUpdate.model_fields if k != "id" and k in row.index},
+                    **{
+                        k: row[k]
+                        for k in PhaseTapChangerUpdate.model_fields
+                        if k != "id" and k in row.index
+                    },
                 )
-                for i, row in network.get_phase_tap_changers().iterrows()
+                for i, row in network.get_phase_tap_changers(
+                    all_attributes=True
+                ).iterrows()
             ]
         )
         self.ratio_tap_changers_to_use_in_network = RatioTapChangerUpdatePayload(
             updates=[
                 RatioTapChangerUpdate(
                     id=str(i),
-                    **{k: row[k] for k in RatioTapChangerUpdate.model_fields if k != "id" and k in row.index},
+                    **{
+                        k: row[k]
+                        for k in RatioTapChangerUpdate.model_fields
+                        if k != "id" and k in row.index
+                    },
                 )
-                for i, row in network.get_ratio_tap_changers().iterrows()
+                for i, row in network.get_ratio_tap_changers(
+                    all_attributes=True
+                ).iterrows()
             ]
         )
 
@@ -271,8 +291,8 @@ class PyPowSyBlBackend(Backend):
             self._grid = None
 
         current_ratio_tap_changers, current_phase_tap_changers = (
-            network.get_ratio_tap_changers(),
-            network.get_phase_tap_changers(),
+            network.get_ratio_tap_changers(all_attributes=True),
+            network.get_phase_tap_changers(all_attributes=True),
         )
 
         n_phase = len(current_phase_tap_changers)
@@ -281,22 +301,37 @@ class PyPowSyBlBackend(Backend):
                 update.id: update.model_dump(exclude_none=True, exclude={"id"})
                 for update in self.phase_tap_changers_to_use_in_network.updates
             }
-            phase_unchanged = [str(i) for i, _ in current_phase_tap_changers.iterrows() if str(i) not in phase_overrides]
+            phase_unchanged = [
+                str(i)
+                for i, _ in current_phase_tap_changers.iterrows()
+                if str(i) not in phase_overrides
+            ]
             n_phase_overridden = n_phase - len(phase_unchanged)
             logger.info(
                 f"Phase tap changers: {n_phase_overridden}/{n_phase} taps overridden via property"
                 + (f" ({100 * n_phase_overridden // n_phase}%)" if n_phase else "")
             )
             if phase_unchanged:
-                logger.info(f"Phase tap changers unchanged (using network values): {phase_unchanged}")
+                logger.info(
+                    f"Phase tap changers unchanged (using network values): {phase_unchanged}"
+                )
         else:
             phase_overrides = {}
-            logger.info(f"Phase tap changers: property not set, using all {n_phase} taps from network")
+            logger.info(
+                f"Phase tap changers: property not set, using all {n_phase} taps from network"
+            )
         self.phase_tap_changers_to_use_in_network = PhaseTapChangerUpdatePayload(
             updates=[
                 PhaseTapChangerUpdate(
                     id=str(i),
-                    **{**{k: row[k] for k in PhaseTapChangerUpdate.model_fields if k != "id" and k in row.index}, **phase_overrides.get(str(i), {})},
+                    **{
+                        **{
+                            k: row[k]
+                            for k in PhaseTapChangerUpdate.model_fields
+                            if k != "id" and k in row.index
+                        },
+                        **phase_overrides.get(str(i), {}),
+                    },
                 )
                 for i, row in current_phase_tap_changers.iterrows()
             ]
@@ -308,22 +343,37 @@ class PyPowSyBlBackend(Backend):
                 update.id: update.model_dump(exclude_none=True, exclude={"id"})
                 for update in self.ratio_tap_changers_to_use_in_network.updates
             }
-            ratio_unchanged = [str(i) for i, _ in current_ratio_tap_changers.iterrows() if str(i) not in ratio_overrides]
+            ratio_unchanged = [
+                str(i)
+                for i, _ in current_ratio_tap_changers.iterrows()
+                if str(i) not in ratio_overrides
+            ]
             n_ratio_overridden = n_ratio - len(ratio_unchanged)
             logger.info(
                 f"Ratio tap changers: {n_ratio_overridden}/{n_ratio} taps overridden via property"
                 + (f" ({100 * n_ratio_overridden // n_ratio}%)" if n_ratio else "")
             )
             if ratio_unchanged:
-                logger.info(f"Ratio tap changers unchanged (using network values): {ratio_unchanged}")
+                logger.info(
+                    f"Ratio tap changers unchanged (using network values): {ratio_unchanged}"
+                )
         else:
             ratio_overrides = {}
-            logger.info(f"Ratio tap changers: property not set, using all {n_ratio} taps from network")
+            logger.info(
+                f"Ratio tap changers: property not set, using all {n_ratio} taps from network"
+            )
         self.ratio_tap_changers_to_use_in_network = RatioTapChangerUpdatePayload(
             updates=[
                 RatioTapChangerUpdate(
                     id=str(i),
-                    **{**{k: row[k] for k in RatioTapChangerUpdate.model_fields if k != "id" and k in row.index}, **ratio_overrides.get(str(i), {})},
+                    **{
+                        **{
+                            k: row[k]
+                            for k in RatioTapChangerUpdate.model_fields
+                            if k != "id" and k in row.index
+                        },
+                        **ratio_overrides.get(str(i), {}),
+                    },
                 )
                 for i, row in current_ratio_tap_changers.iterrows()
             ]
