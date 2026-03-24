@@ -974,7 +974,6 @@ source = { editable = "." }
 dependencies = [
     { name = "grid2op" },
     { name = "numpy" },
-    { name = "pypowsybl" },
     { name = "sortedcontainers" },
     { name = "structlog" },
 ]
@@ -999,7 +998,6 @@ dev = [
 requires-dist = [
     { name = "grid2op", specifier = ">=1.10.5,<=1.12.2" },
     { name = "numpy", specifier = "==1.26.4" },
-    { name = "pypowsybl", specifier = ">=1.14.0" },
     { name = "pypowsybl", marker = "extra == 'pypowsybl'", specifier = ">=1.11.0,<1.15.0" },
     { name = "sortedcontainers", specifier = ">=2.4.0" },
     { name = "structlog", specifier = ">=25.5.0" },
