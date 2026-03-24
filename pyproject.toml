@@ -25,15 +25,10 @@ dev = [
     "prek>=0.3.6",
     "ipykernel>=6.31.0",
     "nbformat>=5.10.4",
-    "pf-projector>=1.11.1",
 ]
 
 [project.optional-dependencies]
 pypowsybl = ["pypowsybl>=1.11.0,<1.15.0"]
-
-[[tool.uv.index]]
-url = "https://pkgs.dev.azure.com/AssistFlux-Project/AssistFlux/_packaging/package-registry/pypi/simple/"
-
 
 [build-system]
 requires = ["hatchling"]
