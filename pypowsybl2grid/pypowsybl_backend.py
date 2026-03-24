@@ -147,13 +147,19 @@ class PyPowSyBlBackend(Backend):
         """Initialise both tap changer properties from the current taps in the given network."""
         self.phase_tap_changers_to_use_in_network = PhaseTapChangerUpdatePayload(
             updates=[
-                PhaseTapChangerUpdate(id=str(i), tap=int(row["tap"]))
+                PhaseTapChangerUpdate(
+                    id=str(i),
+                    **{k: row[k] for k in PhaseTapChangerUpdate.model_fields if k != "id" and k in row.index},
+                )
                 for i, row in network.get_phase_tap_changers().iterrows()
             ]
         )
         self.ratio_tap_changers_to_use_in_network = RatioTapChangerUpdatePayload(
             updates=[
-                RatioTapChangerUpdate(id=str(i), tap=int(row["tap"]))
+                RatioTapChangerUpdate(
+                    id=str(i),
+                    **{k: row[k] for k in RatioTapChangerUpdate.model_fields if k != "id" and k in row.index},
+                )
                 for i, row in network.get_ratio_tap_changers().iterrows()
             ]
         )
