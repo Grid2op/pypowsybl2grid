@@ -27,9 +27,13 @@ class PhaseTapChangerUpdatePayload(BaseModel):
     updates: list[PhaseTapChangerUpdate]
 
     def to_df(self) -> pd.DataFrame:
-        return pd.DataFrame(
+        df = pd.DataFrame(
             [u.model_dump(exclude_none=True) for u in self.updates]
         ).set_index("id")
+        if "regulating" in df.columns:
+                cols = [c for c in df.columns if c != "regulating"] + ["regulating"]
+                df = df[cols]
+        return df
 
 
 class RatioTapChangerUpdatePayload(BaseModel):
