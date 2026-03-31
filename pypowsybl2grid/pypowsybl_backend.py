@@ -393,7 +393,17 @@ class PyPowSyBlBackend(Backend):
             self._connect_all_elements_to_first_bus,
         )
 
-        self._update_backend_network_taps_with_taps_to_use_in_network()
+        phase_taps = self.phase_tap_changers_to_use_in_network
+        ratio_taps = self.ratio_tap_changers_to_use_in_network
+        if isinstance(phase_taps, PhaseTapChangerUpdatePayload) and isinstance(
+            ratio_taps, RatioTapChangerUpdatePayload
+        ):
+            if len(phase_taps.updates) > 0 and len(ratio_taps.updates) > 0:
+                self._update_backend_network_taps_with_taps_to_use_in_network()
+        else:
+            raise ValueError(
+                "Tap ratio and phase to use in the network should be set by now."
+            )
 
         # substations mapped to IIDM voltage levels
         self.name_sub = self._grid.get_string_value(  # pyright: ignore[reportAttributeAccessIssue]
