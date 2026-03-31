@@ -15,7 +15,7 @@ import pypowsybl as pp
 import pytest
 from pypowsybl.network import Network
 
-from pypowsybl2grid.pypowsybl_backend import PyPowSyBlBackend, DEFAULT_LF_PARAMETERS
+from pypowsybl2grid.pypowsybl_backend import DEFAULT_LF_PARAMETERS, PyPowSyBlBackend
 from tests.simple_node_breaker_network import create_simple_node_breaker_network
 
 TOLERANCE = 1e-3
@@ -338,8 +338,9 @@ def test_backend_with_theta(backend):
     conv, _ = backend.runpf()
     assert conv
 
-    assert (np.array([ 0.0, 0.0, 0.04059613, -0.06119749]),
-            np.array([-0.06119749, -0.06119749, 0.0, -0.16780443]),
-            np.array([-0.16780443]),
-            np.array([0.04059613, 0.04059613]),
-            np.array([]))
+    line_or_theta, line_ex_theta, load_theta, gen_theta, storage_theta = backend.get_theta()
+    npt.assert_array_almost_equal(line_or_theta, np.array([ 0.0, 0.0, 0.04059613, -0.06119749]))
+    npt.assert_array_almost_equal(line_ex_theta, np.array([-0.06119749, -0.06119749, 0.0, -0.16780443]))
+    npt.assert_array_almost_equal(load_theta, np.array([-0.16780443]))
+    npt.assert_array_almost_equal(gen_theta, np.array([0.04059613, 0.04059613]))
+    npt.assert_array_almost_equal(storage_theta, np.array([]))

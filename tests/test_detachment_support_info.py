@@ -5,11 +5,9 @@
 # SPDX-License-Identifier: MPL-2.0
 
 import logging
-from typing import Dict
 
 import grid2op
 import grid2op.Space
-    
 import pytest
 
 from pypowsybl2grid.pypowsybl_backend import PyPowSyBlBackend

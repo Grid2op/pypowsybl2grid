@@ -11,6 +11,7 @@ import pypowsybl as pp
 import pytest
 from pypowsybl.network import Network
 
+
 @pytest.fixture(autouse=True)
 def setup():
     logging.basicConfig()
