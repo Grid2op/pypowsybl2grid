@@ -14,7 +14,7 @@ def write_obs_json(obs: BaseObservation, file_name: str):
     result = {}
 
     generators = SortedDict()
-    for (index, name) in enumerate(obs.name_gen):
+    for index, name in enumerate(obs.name_gen):
         generators[name] = {
             "p": float(obs.gen_p[index]),
             "q": float(obs.gen_q[index]),
@@ -24,7 +24,7 @@ def write_obs_json(obs: BaseObservation, file_name: str):
     result["generators"] = generators
 
     loads = SortedDict()
-    for (index, name) in enumerate(obs.name_load):
+    for index, name in enumerate(obs.name_load):
         loads[name] = {
             "p": float(obs.load_p[index]),
             "q": float(obs.load_q[index]),
@@ -34,7 +34,7 @@ def write_obs_json(obs: BaseObservation, file_name: str):
     result["loads"] = loads
 
     shunts = SortedDict()
-    for (index, name) in enumerate(obs.name_shunt):
+    for index, name in enumerate(obs.name_shunt):
         shunts[name] = {
             "p": float(obs._shunt_p[index]),
             "q": float(obs._shunt_q[index]),
@@ -44,7 +44,7 @@ def write_obs_json(obs: BaseObservation, file_name: str):
     result["shunts"] = shunts
 
     lines = SortedDict()
-    for (index, name) in enumerate(obs.name_line):
+    for index, name in enumerate(obs.name_line):
         lines[name] = {
             "status": bool(obs.line_status[index]),
             "p_or": float(obs.p_or[index]),
@@ -56,5 +56,5 @@ def write_obs_json(obs: BaseObservation, file_name: str):
         }
     result["lines"] = lines
 
-    with open(file_name, 'w') as f:
-        json.dump(result, f, indent = 4)
+    with open(file_name, "w") as f:
+        json.dump(result, f, indent=4)
