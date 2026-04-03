@@ -39,6 +39,8 @@ from pypowsybl2grid.models import (
     PhaseTapChangerUpdatePayload,
     RatioTapChangerUpdate,
     RatioTapChangerUpdatePayload,
+    ShuntUpdate,
+    ShuntUpdatePayload,
 )
 
 logger = structlog.get_logger()
@@ -92,6 +94,7 @@ class PyPowSyBlBackend(Backend):
         self._ratio_tap_changers_to_use_in_network: (
             RatioTapChangerUpdatePayload | None
         ) = None
+        self._shunt_data_to_use_in_network: ShuntUpdatePayload | None = None
 
         # caching of the results
         self._gen_p: np.ndarray = np.empty(0, dtype=dt_float)
@@ -124,6 +127,17 @@ class PyPowSyBlBackend(Backend):
         self._storage_theta: np.ndarray = np.empty(0, dtype=dt_float)
 
         self._topo_vect: np.ndarray = np.empty(0, dtype=dt_int)
+
+    @property
+    def shunt_data_to_use_in_network(
+        self,
+    ) -> ShuntUpdatePayload | None:
+        """Shunt compensators to apply when loading the network."""
+        return self._shunt_data_to_use_in_network
+
+    @shunt_data_to_use_in_network.setter
+    def shunt_data_to_use_in_network(self, value: ShuntUpdatePayload) -> None:
+        self._shunt_data_to_use_in_network = value
 
     @property
     def ratio_tap_changers_to_use_in_network(
@@ -184,9 +198,25 @@ class PyPowSyBlBackend(Backend):
             ]
         )
 
+    def init_shunt_data_from_network(self, network: Network) -> None:
+        """Initialise shunt properties from the current taps in the given network."""
+        self.shunt_data_to_use_in_network = ShuntUpdatePayload(
+            updates=[
+                ShuntUpdate(
+                    id=str(i),
+                    **{
+                        k: row[k]
+                        for k in ShuntUpdate.model_fields
+                        if k != "id" and k in row.index
+                    },
+                )
+                for i, row in network.get_shunt_compensators().iterrows()
+            ]
+        )
+
     def _update_backend_network_taps_with_taps_to_use_in_network(self) -> None:
         """
-        This should update the grid2op backend held Network with the
+        This updates the grid2op backend held Network with the
         data store in self.taps_to_use_in_network.
         """
         if (
@@ -212,6 +242,22 @@ class PyPowSyBlBackend(Backend):
         else:
             raise ValueError(
                 "self.network is None, you should have a self.network before trying to update taps on it."
+            )
+
+    def _update_backend_network_shunt_with_shunt_data_to_use_in_network(self) -> None:
+        """
+        This updates the grid2op backend held Network with the
+        data store in self.taps_to_use_in_network.
+        """
+        if not self.shunt_data_to_use_in_network:
+            raise ValueError("You should set self.shunt_data_to_use_in_network")
+        if self.network:
+            self.network.update_shunt_compensators(
+                df=self.shunt_data_to_use_in_network.to_df()
+            )
+        else:
+            raise ValueError(
+                "self.network is None, you should have a self.network before trying to update shunts on it."
             )
 
     @property
@@ -300,6 +346,7 @@ class PyPowSyBlBackend(Backend):
             network.get_ratio_tap_changers(all_attributes=True),
             network.get_phase_tap_changers(all_attributes=True),
         )
+        current_shunt_compensators = network.get_shunt_compensators()
 
         n_phase = len(current_phase_tap_changers)
         if self.phase_tap_changers_to_use_in_network:
@@ -385,6 +432,48 @@ class PyPowSyBlBackend(Backend):
             ]
         )
 
+        n_shunt = len(current_shunt_compensators)
+        if self.shunt_data_to_use_in_network:
+            shunt_overrides = {
+                update.id: update.model_dump(exclude={"id"})
+                for update in self.shunt_data_to_use_in_network.updates
+            }
+            shunt_unchanged = [
+                str(i)
+                for i, _ in current_shunt_compensators.iterrows()
+                if str(i) not in shunt_overrides
+            ]
+            n_shunt_overridden = n_shunt - len(shunt_unchanged)
+            logger.info(
+                f"Shunt compensators: {n_shunt_overridden}/{n_shunt} overridden via property"
+                + (f" ({100 * n_shunt_overridden // n_shunt}%)" if n_shunt else "")
+            )
+            if shunt_unchanged:
+                logger.info(
+                    f"Shunt compensators unchanged (using network values): {shunt_unchanged}"
+                )
+        else:
+            shunt_overrides = {}
+            logger.info(
+                f"Shunt compensators: property not set, using all {n_shunt} from network"
+            )
+        self.shunt_data_to_use_in_network = ShuntUpdatePayload(
+            updates=[
+                ShuntUpdate(
+                    id=str(i),
+                    **{
+                        **{
+                            k: row[k]
+                            for k in ShuntUpdate.model_fields
+                            if k != "id" and k in row.index
+                        },
+                        **shunt_overrides.get(str(i), {}),
+                    },
+                )
+                for i, row in current_shunt_compensators.iterrows()
+            ]
+        )
+
         self._grid = PPBackend(
             network,
             self._consider_open_branch_reactive_flow,
@@ -404,6 +493,13 @@ class PyPowSyBlBackend(Backend):
             raise ValueError(
                 "Tap ratio and phase to use in the network should be set by now."
             )
+
+        shunt_data = self.shunt_data_to_use_in_network
+        if isinstance(shunt_data, ShuntUpdatePayload):
+            if len(shunt_data.updates) > 0:
+                self._update_backend_network_shunt_with_shunt_data_to_use_in_network()
+        else:
+            raise ValueError("Shunt data to use in the network should be set by now.")
 
         # substations mapped to IIDM voltage levels
         self.name_sub = self._grid.get_string_value(  # pyright: ignore[reportAttributeAccessIssue]
