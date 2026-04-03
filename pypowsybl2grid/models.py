@@ -71,3 +71,15 @@ class ShuntUpdatePayload(BaseModel):
 
     def to_df(self) -> pd.DataFrame:
         return pd.DataFrame([u.model_dump() for u in self.updates]).set_index("id")
+
+
+class QUpdate(BaseModel):
+    id: str
+    target_q: float
+
+
+class QUpdatePayload(BaseModel):
+    updates: list[QUpdate]
+
+    def to_df(self):
+        return pd.DataFrame([u.model_dump() for u in self.updates]).set_index("id")

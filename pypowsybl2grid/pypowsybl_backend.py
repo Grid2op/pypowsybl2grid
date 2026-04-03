@@ -37,6 +37,8 @@ from pypowsybl.network.impl.util import get_import_supported_extensions
 from pypowsybl2grid.models import (
     PhaseTapChangerUpdate,
     PhaseTapChangerUpdatePayload,
+    QUpdate,
+    QUpdatePayload,
     RatioTapChangerUpdate,
     RatioTapChangerUpdatePayload,
     ShuntUpdate,
@@ -95,6 +97,7 @@ class PyPowSyBlBackend(Backend):
             RatioTapChangerUpdatePayload | None
         ) = None
         self._shunt_data_to_use_in_network: ShuntUpdatePayload | None = None
+        self._q_values_for_pq_gens: QUpdatePayload | None = None
 
         # caching of the results
         self._gen_p: np.ndarray = np.empty(0, dtype=dt_float)
@@ -138,6 +141,17 @@ class PyPowSyBlBackend(Backend):
     @shunt_data_to_use_in_network.setter
     def shunt_data_to_use_in_network(self, value: ShuntUpdatePayload) -> None:
         self._shunt_data_to_use_in_network = value
+
+    @property
+    def q_values_for_pq_gens(
+        self,
+    ) -> QUpdatePayload:
+        """Target Q values for PQ generators (voltage_regulator_on=False) to apply when loading the network."""
+        return self._q_values_for_pq_gens or QUpdatePayload(updates=[])
+
+    @q_values_for_pq_gens.setter
+    def q_values_for_pq_gens(self, value: QUpdatePayload) -> None:
+        self._q_values_for_pq_gens = value
 
     @property
     def ratio_tap_changers_to_use_in_network(
@@ -213,6 +227,30 @@ class PyPowSyBlBackend(Backend):
                 for i, row in network.get_shunt_compensators().iterrows()
             ]
         )
+
+    def init_pq_gen_q_from_network(self, network: Network) -> None:
+        """Initialise PQ generator Q values from the current generators in the given network."""
+        gens = network.get_generators(all_attributes=True)
+        pq_gens = gens[~gens["voltage_regulator_on"]]
+        self.q_values_for_pq_gens = QUpdatePayload(
+            updates=[
+                QUpdate(id=str(i), target_q=row["target_q"])
+                for i, row in pq_gens.iterrows()
+            ]
+        )
+
+    def _update_backend_network_gens_q_with_pq_gen_q_values(self) -> None:
+        """
+        This updates the grid2op backend held Network with the
+        data stored in self.q_values_for_pq_gens.
+        """
+        if not self.network:
+            raise ValueError(
+                "self.network is None, you should have a self.network before trying to update generator Q values on it."
+            )
+        q_data = self.q_values_for_pq_gens
+        if q_data.updates:
+            self.network.update_generators(df=q_data.to_df())
 
     def _update_backend_network_taps_with_taps_to_use_in_network(self) -> None:
         """
@@ -347,6 +385,10 @@ class PyPowSyBlBackend(Backend):
             network.get_phase_tap_changers(all_attributes=True),
         )
         current_shunt_compensators = network.get_shunt_compensators()
+        current_generators = network.get_generators(all_attributes=True)
+        current_pq_generators = current_generators[
+            ~current_generators["voltage_regulator_on"]
+        ]
 
         n_phase = len(current_phase_tap_changers)
         if self.phase_tap_changers_to_use_in_network:
@@ -474,6 +516,41 @@ class PyPowSyBlBackend(Backend):
             ]
         )
 
+        n_pq_gen = len(current_pq_generators)
+        if self._q_values_for_pq_gens:
+            pq_gen_overrides = {
+                update.id: update.target_q
+                for update in self._q_values_for_pq_gens.updates
+            }
+            pq_gen_unchanged = [
+                str(i)
+                for i, _ in current_pq_generators.iterrows()
+                if str(i) not in pq_gen_overrides
+            ]
+            n_pq_gen_overridden = n_pq_gen - len(pq_gen_unchanged)
+            logger.info(
+                f"PQ generators: {n_pq_gen_overridden}/{n_pq_gen} target_q overridden via property"
+                + (f" ({100 * n_pq_gen_overridden // n_pq_gen}%)" if n_pq_gen else "")
+            )
+            if pq_gen_unchanged:
+                logger.info(
+                    f"PQ generators unchanged (using network values): {pq_gen_unchanged}"
+                )
+        else:
+            pq_gen_overrides = {}
+            logger.info(
+                f"PQ generators: property not set, using all {n_pq_gen} target_q from network"
+            )
+        self.q_values_for_pq_gens = QUpdatePayload(
+            updates=[
+                QUpdate(
+                    id=str(i),
+                    target_q=pq_gen_overrides.get(str(i), float(row["target_q"])),
+                )
+                for i, row in current_pq_generators.iterrows()
+            ]
+        )
+
         self._grid = PPBackend(
             network,
             self._consider_open_branch_reactive_flow,
@@ -500,6 +577,8 @@ class PyPowSyBlBackend(Backend):
                 self._update_backend_network_shunt_with_shunt_data_to_use_in_network()
         else:
             raise ValueError("Shunt data to use in the network should be set by now.")
+
+        self._update_backend_network_gens_q_with_pq_gen_q_values()
 
         # substations mapped to IIDM voltage levels
         self.name_sub = self._grid.get_string_value(  # pyright: ignore[reportAttributeAccessIssue]
