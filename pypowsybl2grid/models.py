@@ -76,6 +76,7 @@ class ShuntUpdatePayload(BaseModel):
 class QUpdate(BaseModel):
     id: str
     target_q: float
+    voltage_regulator_on: bool
 
 
 class QUpdatePayload(BaseModel):

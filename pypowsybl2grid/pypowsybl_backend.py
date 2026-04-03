@@ -234,7 +234,11 @@ class PyPowSyBlBackend(Backend):
         pq_gens = gens[~gens["voltage_regulator_on"]]
         self.q_values_for_pq_gens = QUpdatePayload(
             updates=[
-                QUpdate(id=str(i), target_q=row["target_q"])
+                QUpdate(
+                    id=str(i),
+                    target_q=row["target_q"],
+                    voltage_regulator_on=row["voltage_regulator_on"],
+                )
                 for i, row in pq_gens.iterrows()
             ]
         )
@@ -519,7 +523,7 @@ class PyPowSyBlBackend(Backend):
         n_pq_gen = len(current_pq_generators)
         if self._q_values_for_pq_gens:
             pq_gen_overrides = {
-                update.id: update.target_q
+                update.id: update.model_dump(exclude={"id"})
                 for update in self._q_values_for_pq_gens.updates
             }
             pq_gen_unchanged = [
@@ -529,7 +533,7 @@ class PyPowSyBlBackend(Backend):
             ]
             n_pq_gen_overridden = n_pq_gen - len(pq_gen_unchanged)
             logger.info(
-                f"PQ generators: {n_pq_gen_overridden}/{n_pq_gen} target_q overridden via property"
+                f"PQ generators: {n_pq_gen_overridden}/{n_pq_gen} overridden via property"
                 + (f" ({100 * n_pq_gen_overridden // n_pq_gen}%)" if n_pq_gen else "")
             )
             if pq_gen_unchanged:
@@ -539,13 +543,20 @@ class PyPowSyBlBackend(Backend):
         else:
             pq_gen_overrides = {}
             logger.info(
-                f"PQ generators: property not set, using all {n_pq_gen} target_q from network"
+                f"PQ generators: property not set, using all {n_pq_gen} from network"
             )
         self.q_values_for_pq_gens = QUpdatePayload(
             updates=[
                 QUpdate(
                     id=str(i),
-                    target_q=pq_gen_overrides.get(str(i), float(row["target_q"])),
+                    **{
+                        **{
+                            k: row[k]
+                            for k in QUpdate.model_fields
+                            if k != "id" and k in row.index
+                        },
+                        **pq_gen_overrides.get(str(i), {}),
+                    },
                 )
                 for i, row in current_pq_generators.iterrows()
             ]
