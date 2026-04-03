@@ -231,7 +231,6 @@ class PyPowSyBlBackend(Backend):
     def init_pq_gen_q_from_network(self, network: Network) -> None:
         """Initialise PQ generator Q values from the current generators in the given network."""
         gens = network.get_generators(all_attributes=True)
-        pq_gens = gens[~gens["voltage_regulator_on"]]
         self.q_values_for_pq_gens = QUpdatePayload(
             updates=[
                 QUpdate(
@@ -239,7 +238,7 @@ class PyPowSyBlBackend(Backend):
                     target_q=row["target_q"],
                     voltage_regulator_on=row["voltage_regulator_on"],
                 )
-                for i, row in pq_gens.iterrows()
+                for i, row in gens.iterrows()
             ]
         )
 
