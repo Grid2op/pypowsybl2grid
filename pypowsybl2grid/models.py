@@ -59,8 +59,8 @@ class RatioTapChangerUpdatePayload(BaseModel):
 
 class ShuntUpdate(BaseModel):
     id: str
-    section_count: str
-    voltage_regulator_on: bool
+    section_count: int
+    voltage_regulation_on: bool
     target_v: float | None
     target_deadband: float | None
     connected: bool
