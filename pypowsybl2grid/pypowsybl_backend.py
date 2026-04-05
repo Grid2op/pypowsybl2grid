@@ -4,6 +4,7 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 # SPDX-License-Identifier: MPL-2.0
 
+import logging
 import os
 import time
 import warnings
@@ -11,7 +12,6 @@ from typing import Optional, Tuple, Union
 
 import numpy as np
 import pandapower as pdp
-import structlog
 from grid2op.Action._backendAction import _BackendAction
 from grid2op.Backend import Backend
 from grid2op.dtypes import dt_float, dt_int
@@ -45,7 +45,7 @@ from pypowsybl2grid.models import (
     ShuntUpdatePayload,
 )
 
-logger = structlog.get_logger()
+logger = logging.getLogger("pypowsybl2grid")
 
 DEFAULT_LF_PARAMETERS = Parameters(voltage_init_mode=VoltageInitMode.DC_VALUES)
 
@@ -311,6 +311,8 @@ class PyPowSyBlBackend(Backend):
         filename: Optional[Union[os.PathLike, str]] = None,
     ) -> None:
         start_time = time.perf_counter()
+        full_path = self.make_complete_path(path, filename)
+        logger.info(f"Loading network from path {full_path}")
         cls = type(self)
         if hasattr(cls, "can_handle_more_than_2_busbar"):
             # grid2op version >= 1.10.0 then we use this
@@ -325,11 +327,6 @@ class PyPowSyBlBackend(Backend):
                 # default behaviour in grid2op before detachment is allowed
                 self._check_isolated_and_disconnected_injections = True
 
-        # load network
-        full_path = self.make_complete_path(path, filename)
-
-        logger.info(f"Loading network from '{full_path}'")
-
         if full_path.endswith(".json"):
             n_pdp = pdp.from_json(full_path)
             network = convert_from_pandapower(n_pdp)
@@ -337,10 +334,17 @@ class PyPowSyBlBackend(Backend):
             network = load(full_path)
 
         self.load_grid_from_iidm(network)
-
-        end_time = time.perf_counter()
-        elapsed_time = (end_time - start_time) * 1000
-        logger.info(f"Network '{network.id}' loaded in {elapsed_time:.2f} ms")
+        logger.info(
+            f"Network loaded from path {full_path} in {(time.perf_counter() - start_time) * 1000}"
+        )
+        logger.info(
+            "Network topology: %d substations, %d loads, %d generators, %d lines, %d shunts",
+            self.n_sub,
+            self.n_load,
+            self.n_gen,
+            self.n_line,
+            self.n_shunt,
+        )
 
     def check_detachment_coherent(self):
         if self._check_isolated_and_disconnected_injections is None:
@@ -694,7 +698,7 @@ class PyPowSyBlBackend(Backend):
         if backend_action is None:
             return
 
-        logger.info("Applying action")
+        logger.debug("Applying action to grid...")
 
         start_time = time.time()
 
@@ -753,7 +757,7 @@ class PyPowSyBlBackend(Backend):
 
         end_time = time.time()
         elapsed_time = (end_time - start_time) * 1000
-        logger.info(f"Action applied in {elapsed_time:.2f} ms")
+        logger.debug(f"Action applied in {elapsed_time:.2f} ms")
 
     @staticmethod
     def _is_converged(result: ComponentResult) -> bool:
@@ -763,7 +767,7 @@ class PyPowSyBlBackend(Backend):
         )
 
     def runpf(self, is_dc: bool = False) -> Tuple[bool, Union[Exception, None]]:
-        logger.info(f"Running {'DC' if is_dc else 'AC'} powerflow")
+        logger.debug(f"Running {'DC' if is_dc else 'AC'} powerflow")
 
         start_time = time.perf_counter()
 
@@ -917,7 +921,9 @@ class PyPowSyBlBackend(Backend):
         path: Union[os.PathLike, str],
         grid_filename: Optional[Union[os.PathLike, str]] = None,
     ) -> None:
-        logger.info("Reset backend")
+        logger.info(
+            f"Backend is being reset and grid will be reloaded from path {path}"
+        )
         self.load_grid(path, filename=grid_filename)
 
     def close(self) -> None:
