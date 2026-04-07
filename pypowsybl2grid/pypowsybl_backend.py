@@ -391,6 +391,8 @@ class PyPowSyBlBackend(Backend):
             network.get_ratio_tap_changers(all_attributes=True),
             network.get_phase_tap_changers(all_attributes=True),
         )
+        phase_tap_steps = network.get_phase_tap_changer_steps()
+        ratio_tap_steps = network.get_ratio_tap_changer_steps()
         current_shunt_compensators = network.get_shunt_compensators()
         current_generators = network.get_generators(all_attributes=True)
         current_pq_generators = current_generators[
@@ -428,9 +430,14 @@ class PyPowSyBlBackend(Backend):
                     id=str(i),
                     **{
                         **{
-                            k: row[k]
+                            k: (
+                                phase_tap_steps.loc[(i, row["tap"]), k]
+                                if k in phase_tap_steps.columns
+                                else row[k]
+                            )
                             for k in PhaseTapChangerUpdate.model_fields
-                            if k != "id" and k in row.index
+                            if k != "id"
+                            and k in (row.index.tolist() + phase_tap_steps.columns.tolist())
                         },
                         **phase_overrides.get(str(i), {}),
                     },
@@ -470,9 +477,14 @@ class PyPowSyBlBackend(Backend):
                     id=str(i),
                     **{
                         **{
-                            k: row[k]
+                            k: (
+                                ratio_tap_steps.loc[(i, row["tap"]), k]
+                                if k in ratio_tap_steps.columns
+                                else row[k]
+                            )
                             for k in RatioTapChangerUpdate.model_fields
-                            if k != "id" and k in row.index
+                            if k != "id"
+                            and k in (row.index.tolist() + ratio_tap_steps.columns.tolist())
                         },
                         **ratio_overrides.get(str(i), {}),
                     },
