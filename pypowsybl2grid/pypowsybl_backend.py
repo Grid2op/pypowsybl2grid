@@ -181,14 +181,21 @@ class PyPowSyBlBackend(Backend):
 
     def init_tap_changers_from_network(self, network: Network) -> None:
         """Initialise both tap changer properties from the current taps in the given network."""
+        phase_tap_steps = network.get_phase_tap_changer_steps()
+        ratio_tap_steps = network.get_ratio_tap_changer_steps()
         self.phase_tap_changers_to_use_in_network = PhaseTapChangerUpdatePayload(
             updates=[
                 PhaseTapChangerUpdate(
                     id=str(i),
-                    **{
-                        k: row[k]
+                    **{ # type: ignore
+                        k: (
+                            phase_tap_steps.at[(i, row["tap"]), k] # type: ignore
+                            if k in phase_tap_steps.columns
+                            else row[k]
+                        )
                         for k in PhaseTapChangerUpdate.model_fields
-                        if k != "id" and k in row.index
+                        if k != "id"
+                        and k in (row.index.tolist() + phase_tap_steps.columns.tolist())
                     },
                 )
                 for i, row in network.get_phase_tap_changers(
@@ -200,10 +207,15 @@ class PyPowSyBlBackend(Backend):
             updates=[
                 RatioTapChangerUpdate(
                     id=str(i),
-                    **{
-                        k: row[k]
+                    **{ # type: ignore
+                        k: (
+                            ratio_tap_steps.at[(i, row["tap"]), k] # type: ignore
+                            if k in ratio_tap_steps.columns
+                            else row[k]
+                        )
                         for k in RatioTapChangerUpdate.model_fields
-                        if k != "id" and k in row.index
+                        if k != "id"
+                        and k in (row.index.tolist() + ratio_tap_steps.columns.tolist())
                     },
                 )
                 for i, row in network.get_ratio_tap_changers(
@@ -431,7 +443,7 @@ class PyPowSyBlBackend(Backend):
                     **{
                         **{
                             k: (
-                                phase_tap_steps.loc[(i, row["tap"]), k]
+                                phase_tap_steps.at[(i, row["tap"]), k] # type: ignore
                                 if k in phase_tap_steps.columns
                                 else row[k]
                             )
@@ -478,7 +490,7 @@ class PyPowSyBlBackend(Backend):
                     **{
                         **{
                             k: (
-                                ratio_tap_steps.loc[(i, row["tap"]), k]
+                                ratio_tap_steps.at[(i, row["tap"]), k] # type: ignore
                                 if k in ratio_tap_steps.columns
                                 else row[k]
                             )
