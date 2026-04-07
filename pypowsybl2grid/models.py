@@ -5,6 +5,11 @@ from pydantic import BaseModel
 class PhaseTapChangerUpdate(BaseModel):
     id: str
     tap: int
+    rho: float
+    r: float
+    x: float
+    g: float
+    b: float
     regulating: bool | None = None
     regulation_mode: str | None = None
     regulation_value: float | None = None
@@ -16,6 +21,11 @@ class PhaseTapChangerUpdate(BaseModel):
 class RatioTapChangerUpdate(BaseModel):
     id: str
     tap: int
+    rho: float
+    r: float
+    x: float
+    g: float
+    b: float
     oltc: bool | None = None
     regulating: bool | None = None
     regulated_side: str | None = None
@@ -23,12 +33,15 @@ class RatioTapChangerUpdate(BaseModel):
     target_deadband: float | None = None
 
 
+_STEP_FIELDS = {"rho", "r", "x", "g", "b"}
+
+
 class PhaseTapChangerUpdatePayload(BaseModel):
     updates: list[PhaseTapChangerUpdate]
 
     def to_df(self) -> tuple[pd.DataFrame, pd.DataFrame]:
         df = pd.DataFrame(
-            [u.model_dump(exclude_none=True) for u in self.updates]
+            [u.model_dump(exclude_none=True, exclude=_STEP_FIELDS) for u in self.updates]
         ).set_index("id")
         if "regulating" in df.columns:
             other_cols = [c for c in df.columns if c != "regulating"]
@@ -48,7 +61,7 @@ class RatioTapChangerUpdatePayload(BaseModel):
 
     def to_df(self) -> tuple[pd.DataFrame, pd.DataFrame]:
         df = pd.DataFrame(
-            [u.model_dump(exclude_none=True) for u in self.updates]
+            [u.model_dump(exclude_none=True, exclude=_STEP_FIELDS) for u in self.updates]
         ).set_index("id")
         if "regulating" in df.columns:
             other_cols = [c for c in df.columns if c != "regulating"]
