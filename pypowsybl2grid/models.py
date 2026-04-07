@@ -39,6 +39,9 @@ class PhaseTapChangerUpdatePayload(BaseModel):
             df_disabling = df.iloc[0:0]
         return df_enabling, df_disabling
 
+    def to_dict(self) -> list[dict]:
+        return [u.model_dump(exclude_none=True) for u in self.updates]
+
 
 class RatioTapChangerUpdatePayload(BaseModel):
     updates: list[RatioTapChangerUpdate]
@@ -56,6 +59,9 @@ class RatioTapChangerUpdatePayload(BaseModel):
             df_disabling = df.iloc[0:0]
         return df_enabling, df_disabling
 
+    def to_dict(self) -> list[dict]:
+        return [u.model_dump(exclude_none=True) for u in self.updates]
+
 
 class ShuntUpdate(BaseModel):
     id: str
@@ -71,6 +77,9 @@ class ShuntUpdatePayload(BaseModel):
 
     def to_df(self) -> pd.DataFrame:
         return pd.DataFrame([u.model_dump() for u in self.updates]).set_index("id")
+
+    def to_dict(self) -> list[dict]:
+        return [u.model_dump(exclude_none=True) for u in self.updates]
 
 
 class QUpdate(BaseModel):
