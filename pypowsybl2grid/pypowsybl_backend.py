@@ -183,45 +183,45 @@ class PyPowSyBlBackend(Backend):
         """Initialise both tap changer properties from the current taps in the given network."""
         phase_tap_steps = network.get_phase_tap_changer_steps()
         ratio_tap_steps = network.get_ratio_tap_changer_steps()
+        phase_updates = []
+        for i, row in network.get_phase_tap_changers(all_attributes=True).iterrows():
+            phase_update = PhaseTapChangerUpdate(
+                id=str(i),
+                tap=row["tap"],
+                rho=phase_tap_steps.loc[str(i)]["rho"].values[0],
+                r=phase_tap_steps.loc[str(i)]["r"].values[0],
+                x=phase_tap_steps.loc[str(i)]["x"].values[0],
+                g=phase_tap_steps.loc[str(i)]["g"].values[0],
+                b=phase_tap_steps.loc[str(i)]["b"].values[0],
+                regulating=row["regulating"],
+                regulation_mode=row["regulation_mode"],
+                regulation_value=row["regulation_value"],
+                regulated_side=row["regulated_side"],
+                target_deadband=row["target_deadband"],
+            )
+            phase_updates.append(phase_update)
+        ratio_updates = []
+        for i, row in network.get_ratio_tap_changers(all_attributes=True).iterrows():
+            ratio_update = RatioTapChangerUpdate(
+                id=str(i),
+                tap=row["tap"],
+                rho=ratio_tap_steps.loc[str(i)]["rho"].values[0],
+                r=ratio_tap_steps.loc[str(i)]["r"].values[0],
+                x=ratio_tap_steps.loc[str(i)]["x"].values[0],
+                g=ratio_tap_steps.loc[str(i)]["g"].values[0],
+                b=ratio_tap_steps.loc[str(i)]["b"].values[0],
+                regulating=row["regulating"],
+                oltc=row["oltc"],
+                regulated_side=row["regulated_side"],
+                target_deadband=row["target_deadband"],
+            )
+            ratio_updates.append(ratio_update)
+
         self.phase_tap_changers_to_use_in_network = PhaseTapChangerUpdatePayload(
-            updates=[
-                PhaseTapChangerUpdate(
-                    id=str(i),
-                    **{ # type: ignore
-                        k: (
-                            phase_tap_steps.at[(i, row["tap"]), k] # type: ignore
-                            if k in phase_tap_steps.columns
-                            else row[k]
-                        )
-                        for k in PhaseTapChangerUpdate.model_fields
-                        if k != "id"
-                        and k in (row.index.tolist() + phase_tap_steps.columns.tolist())
-                    },
-                )
-                for i, row in network.get_phase_tap_changers(
-                    all_attributes=True
-                ).iterrows()
-            ]
+            updates=phase_updates
         )
         self.ratio_tap_changers_to_use_in_network = RatioTapChangerUpdatePayload(
-            updates=[
-                RatioTapChangerUpdate(
-                    id=str(i),
-                    **{ # type: ignore
-                        k: (
-                            ratio_tap_steps.at[(i, row["tap"]), k] # type: ignore
-                            if k in ratio_tap_steps.columns
-                            else row[k]
-                        )
-                        for k in RatioTapChangerUpdate.model_fields
-                        if k != "id"
-                        and k in (row.index.tolist() + ratio_tap_steps.columns.tolist())
-                    },
-                )
-                for i, row in network.get_ratio_tap_changers(
-                    all_attributes=True
-                ).iterrows()
-            ]
+            updates=ratio_updates
         )
 
     def init_shunt_data_from_network(self, network: Network) -> None:
@@ -403,8 +403,12 @@ class PyPowSyBlBackend(Backend):
             network.get_ratio_tap_changers(all_attributes=True),
             network.get_phase_tap_changers(all_attributes=True),
         )
-        phase_tap_steps = network.get_phase_tap_changer_steps()
-        ratio_tap_steps = network.get_ratio_tap_changer_steps()
+        current_phase_tap_steps = network.get_phase_tap_changer_steps(
+            all_attributes=True
+        )
+        current_ratio_tap_steps = network.get_ratio_tap_changer_steps(
+            all_attributes=True
+        )
         current_shunt_compensators = network.get_shunt_compensators()
         current_generators = network.get_generators(all_attributes=True)
         current_pq_generators = current_generators[
@@ -436,26 +440,26 @@ class PyPowSyBlBackend(Backend):
             logger.info(
                 f"Phase tap changers: property not set, using all {n_phase} taps from network"
             )
+
+        phase_updates = []
+        for i, row in network.get_phase_tap_changers(all_attributes=True).iterrows():
+            phase_update = PhaseTapChangerUpdate(
+                id=str(i),
+                tap=row["tap"],
+                rho=current_phase_tap_steps.loc[str(i)]["rho"].values[0],
+                r=current_phase_tap_steps.loc[str(i)]["r"].values[0],
+                x=current_phase_tap_steps.loc[str(i)]["x"].values[0],
+                g=current_phase_tap_steps.loc[str(i)]["g"].values[0],
+                b=current_phase_tap_steps.loc[str(i)]["b"].values[0],
+                regulating=row["regulating"],
+                regulation_mode=row["regulation_mode"],
+                regulation_value=row["regulation_value"],
+                regulated_side=row["regulated_side"],
+                target_deadband=row["target_deadband"],
+            )
+            phase_updates.append(phase_update)
         self.phase_tap_changers_to_use_in_network = PhaseTapChangerUpdatePayload(
-            updates=[
-                PhaseTapChangerUpdate(
-                    id=str(i),
-                    **{
-                        **{
-                            k: (
-                                phase_tap_steps.at[(i, row["tap"]), k] # type: ignore
-                                if k in phase_tap_steps.columns
-                                else row[k]
-                            )
-                            for k in PhaseTapChangerUpdate.model_fields
-                            if k != "id"
-                            and k in (row.index.tolist() + phase_tap_steps.columns.tolist())
-                        },
-                        **phase_overrides.get(str(i), {}),
-                    },
-                )
-                for i, row in current_phase_tap_changers.iterrows()
-            ]
+            updates=phase_updates
         )
 
         n_ratio = len(current_ratio_tap_changers)
@@ -483,28 +487,27 @@ class PyPowSyBlBackend(Backend):
             logger.info(
                 f"Ratio tap changers: property not set, using all {n_ratio} taps from network"
             )
-        self.ratio_tap_changers_to_use_in_network = RatioTapChangerUpdatePayload(
-            updates=[
-                RatioTapChangerUpdate(
-                    id=str(i),
-                    **{
-                        **{
-                            k: (
-                                ratio_tap_steps.at[(i, row["tap"]), k] # type: ignore
-                                if k in ratio_tap_steps.columns
-                                else row[k]
-                            )
-                            for k in RatioTapChangerUpdate.model_fields
-                            if k != "id"
-                            and k in (row.index.tolist() + ratio_tap_steps.columns.tolist())
-                        },
-                        **ratio_overrides.get(str(i), {}),
-                    },
-                )
-                for i, row in current_ratio_tap_changers.iterrows()
-            ]
-        )
 
+        ratio_updates = []
+        for i, row in network.get_ratio_tap_changers(all_attributes=True).iterrows():
+            ratio_update = RatioTapChangerUpdate(
+                id=str(i),
+                tap=row["tap"],
+                rho=current_ratio_tap_steps.loc[str(i)]["rho"].values[0],
+                r=current_ratio_tap_steps.loc[str(i)]["r"].values[0],
+                x=current_ratio_tap_steps.loc[str(i)]["x"].values[0],
+                g=current_ratio_tap_steps.loc[str(i)]["g"].values[0],
+                b=current_ratio_tap_steps.loc[str(i)]["b"].values[0],
+                regulating=row["regulating"],
+                oltc=row["oltc"],
+                regulated_side=row["regulated_side"],
+                target_deadband=row["target_deadband"],
+            )
+            ratio_updates.append(ratio_update)
+
+        self.ratio_tap_changers_to_use_in_network = RatioTapChangerUpdatePayload(
+            updates=ratio_updates
+        )
         n_shunt = len(current_shunt_compensators)
         if self.shunt_data_to_use_in_network:
             shunt_overrides = {

@@ -10,12 +10,11 @@ class PhaseTapChangerUpdate(BaseModel):
     x: float
     g: float
     b: float
-    regulating: bool | None = None
-    regulation_mode: str | None = None
-    regulation_value: float | None = None
-    regulated_side: str | None = None
+    regulating: bool
+    regulation_mode: str
+    regulation_value: float
+    regulated_side: str
     target_deadband: float | None = None
-    fictitious: bool | None = None
 
 
 class RatioTapChangerUpdate(BaseModel):
@@ -26,9 +25,9 @@ class RatioTapChangerUpdate(BaseModel):
     x: float
     g: float
     b: float
-    oltc: bool | None = None
-    regulating: bool | None = None
-    regulated_side: str | None = None
+    regulating: bool
+    oltc: bool
+    regulated_side: str
     target_v: float | None = None
     target_deadband: float | None = None
 
@@ -41,7 +40,10 @@ class PhaseTapChangerUpdatePayload(BaseModel):
 
     def to_df(self) -> tuple[pd.DataFrame, pd.DataFrame]:
         df = pd.DataFrame(
-            [u.model_dump(exclude_none=True, exclude=_STEP_FIELDS) for u in self.updates]
+            [
+                u.model_dump(exclude_none=True, exclude=_STEP_FIELDS)
+                for u in self.updates
+            ]
         ).set_index("id")
         if "regulating" in df.columns:
             other_cols = [c for c in df.columns if c != "regulating"]
@@ -61,7 +63,10 @@ class RatioTapChangerUpdatePayload(BaseModel):
 
     def to_df(self) -> tuple[pd.DataFrame, pd.DataFrame]:
         df = pd.DataFrame(
-            [u.model_dump(exclude_none=True, exclude=_STEP_FIELDS) for u in self.updates]
+            [
+                u.model_dump(exclude_none=True, exclude=_STEP_FIELDS)
+                for u in self.updates
+            ]
         ).set_index("id")
         if "regulating" in df.columns:
             other_cols = [c for c in df.columns if c != "regulating"]
@@ -80,9 +85,9 @@ class ShuntUpdate(BaseModel):
     id: str
     section_count: int
     voltage_regulation_on: bool
+    connected: bool
     target_v: float | None
     target_deadband: float | None
-    connected: bool
 
 
 class ShuntUpdatePayload(BaseModel):
