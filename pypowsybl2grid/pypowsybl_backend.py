@@ -7,104 +7,273 @@
 import logging
 import os
 import time
-from typing import Optional, Tuple, Union
 import warnings
-
-import grid2op
-from grid2op.dtypes import dt_float, dt_int
-from grid2op.Backend import Backend
-from grid2op.Exceptions import DivergingPowerflow
-from grid2op.Space import DEFAULT_N_BUSBAR_PER_SUB
+from typing import Optional, Tuple, Union
 
 import numpy as np
 import pandapower as pdp
-import pypowsybl as pp
-import pypowsybl.grid2op
+from grid2op.Action._backendAction import _BackendAction
+from grid2op.Backend import Backend
+from grid2op.dtypes import dt_float, dt_int
+from grid2op.Exceptions import DivergingPowerflow
+from grid2op.Space import DEFAULT_N_BUSBAR_PER_SUB
+from pypowsybl._pypowsybl import (
+    Grid2opDoubleValueType,
+    Grid2opIntegerValueType,
+    Grid2opStringValueType,
+    Grid2opUpdateDoubleValueType,
+    Grid2opUpdateIntegerValueType,
+    LoadFlowComponentStatus,
+    VoltageInitMode,
+)
+from pypowsybl.grid2op.impl.backend import Backend as PPBackend
+from pypowsybl.loadflow.impl.component_result import ComponentResult
+from pypowsybl.loadflow.impl.parameters import Parameters
+from pypowsybl.network.impl.network import Network
+from pypowsybl.network.impl.network_creation_util import load
+from pypowsybl.network.impl.pandapower_converter import convert_from_pandapower
+from pypowsybl.network.impl.util import get_import_supported_extensions
 
-logger = logging.getLogger(__name__)
+from pypowsybl2grid.models import (
+    GenUpdate,
+    GenUpdatePayload,
+    PhaseTapChangerUpdate,
+    PhaseTapChangerUpdatePayload,
+    RatioTapChangerUpdate,
+    RatioTapChangerUpdatePayload,
+    ShuntUpdate,
+    ShuntUpdatePayload,
+)
 
-DEFAULT_LF_PARAMETERS = pp.loadflow.Parameters(voltage_init_mode=pp.loadflow.VoltageInitMode.DC_VALUES)
+logger = logging.getLogger("pypowsybl2grid")
+
+DEFAULT_LF_PARAMETERS = Parameters(voltage_init_mode=VoltageInitMode.DC_VALUES)
+
 
 class PyPowSyBlBackend(Backend):
+    shunts_data_available = True
 
-    def __init__(self,
-                 detailed_infos_for_cascading_failures:bool=False,
-                 can_be_copied:bool=True,
-                 check_isolated_and_disconnected_injections:Optional[bool]=None,
-                 consider_open_branch_reactive_flow:bool = False,
-                 n_busbar_per_sub:int = DEFAULT_N_BUSBAR_PER_SUB,
-                 connect_all_elements_to_first_bus:bool = False,
-                 lf_parameters: pp.loadflow.Parameters = None):
-        Backend.__init__(self,
-                         detailed_infos_for_cascading_failures=detailed_infos_for_cascading_failures,
-                         can_be_copied=can_be_copied,
-                         # save this kwargs (might be needed)
-                         check_isolated_and_disconnected_injections=check_isolated_and_disconnected_injections,
-                         consider_open_branch_reactive_flow=consider_open_branch_reactive_flow,
-                         connect_all_elements_to_first_bus=connect_all_elements_to_first_bus,
-                         lf_parameters=lf_parameters
-                         )
-        
-        self._check_isolated_and_disconnected_injections = check_isolated_and_disconnected_injections
+    def __init__(
+        self,
+        detailed_infos_for_cascading_failures: bool = False,
+        can_be_copied: bool = True,
+        check_isolated_and_disconnected_injections: bool | None = None,
+        consider_open_branch_reactive_flow: bool = False,
+        n_busbar_per_sub: int = DEFAULT_N_BUSBAR_PER_SUB,
+        connect_all_elements_to_first_bus: bool = False,
+        lf_parameters: Parameters | None = None,
+    ):
+        Backend.__init__(
+            self,
+            detailed_infos_for_cascading_failures=detailed_infos_for_cascading_failures,
+            can_be_copied=can_be_copied,
+            # save this kwargs (might be needed)
+            check_isolated_and_disconnected_injections=check_isolated_and_disconnected_injections,
+            consider_open_branch_reactive_flow=consider_open_branch_reactive_flow,
+            connect_all_elements_to_first_bus=connect_all_elements_to_first_bus,
+            lf_parameters=lf_parameters,
+        )
+
+        self._check_isolated_and_disconnected_injections = (
+            check_isolated_and_disconnected_injections
+        )
         self._consider_open_branch_reactive_flow = consider_open_branch_reactive_flow
-        self.n_busbar_per_sub = n_busbar_per_sub
+        self.n_busbar_per_sub = n_busbar_per_sub  # pyright: ignore[reportAttributeAccessIssue]
         self._connect_all_elements_to_first_bus = connect_all_elements_to_first_bus
         if lf_parameters is None:
             self._lf_parameters = DEFAULT_LF_PARAMETERS
         else:
             self._lf_parameters = lf_parameters
 
-        self.can_output_theta = True
+        self.can_output_theta = True  # pyright: ignore[reportAttributeAccessIssue]
 
-        self.shunts_data_available = True
-        self.supported_grid_format = pp.network.get_import_supported_extensions()
+        self.supported_grid_format = get_import_supported_extensions()  # pyright: ignore[reportAttributeAccessIssue]
 
         self._grid = None
+        self._phase_tap_changers_to_use_in_network: (
+            PhaseTapChangerUpdatePayload | None
+        ) = None
+        self._ratio_tap_changers_to_use_in_network: (
+            RatioTapChangerUpdatePayload | None
+        ) = None
+        self._shunt_data_to_use_in_network: ShuntUpdatePayload | None = None
+        self._q_values_for_pq_gens: GenUpdatePayload | None = None
 
         # caching of the results
-        self._gen_p = None
-        self._gen_q = None
-        self._gen_v = None
+        self._gen_p: np.ndarray = np.empty(0, dtype=dt_float)
+        self._gen_q: np.ndarray = np.empty(0, dtype=dt_float)
+        self._gen_v: np.ndarray = np.empty(0, dtype=dt_float)
 
-        self._load_p = None
-        self._load_q = None
-        self._load_v = None
+        self._load_p: np.ndarray = np.empty(0, dtype=dt_float)
+        self._load_q: np.ndarray = np.empty(0, dtype=dt_float)
+        self._load_v: np.ndarray = np.empty(0, dtype=dt_float)
 
-        self._por = None
-        self._qor = None
-        self._aor = None
-        self._vor = None
+        self._por: np.ndarray = np.empty(0, dtype=dt_float)
+        self._qor: np.ndarray = np.empty(0, dtype=dt_float)
+        self._aor: np.ndarray = np.empty(0, dtype=dt_float)
+        self._vor: np.ndarray = np.empty(0, dtype=dt_float)
 
-        self._pex = None
-        self._qex = None
-        self._aex = None
-        self._vex = None
+        self._pex: np.ndarray = np.empty(0, dtype=dt_float)
+        self._qex: np.ndarray = np.empty(0, dtype=dt_float)
+        self._aex: np.ndarray = np.empty(0, dtype=dt_float)
+        self._vex: np.ndarray = np.empty(0, dtype=dt_float)
 
-        self._shunt_p = None
-        self._shunt_q = None
-        self._shunt_v = None
-        self._shunt_bus = None
+        self._shunt_p: np.ndarray = np.empty(0, dtype=dt_float)
+        self._shunt_q: np.ndarray = np.empty(0, dtype=dt_float)
+        self._shunt_v: np.ndarray = np.empty(0, dtype=dt_float)
+        self._shunt_bus: np.ndarray = np.empty(0, dtype=dt_int)
 
-        self._gen_theta = None
-        self._load_theta = None
-        self._line_or_theta = None
-        self._line_ex_theta = None
+        self._gen_theta: np.ndarray = np.empty(0, dtype=dt_float)
+        self._load_theta: np.ndarray = np.empty(0, dtype=dt_float)
+        self._line_or_theta: np.ndarray = np.empty(0, dtype=dt_float)
+        self._line_ex_theta: np.ndarray = np.empty(0, dtype=dt_float)
+        self._storage_theta: np.ndarray = np.empty(0, dtype=dt_float)
 
-        self._topo_vect = None
+        self._topo_vect: np.ndarray = np.empty(0, dtype=dt_int)
 
     @property
-    def network(self) -> pp.network.Network:
+    def shunt_data_to_use_in_network(
+        self,
+    ) -> ShuntUpdatePayload | None:
+        """Shunt compensators to apply when loading the network."""
+        return self._shunt_data_to_use_in_network
+
+    @shunt_data_to_use_in_network.setter
+    def shunt_data_to_use_in_network(self, value: ShuntUpdatePayload) -> None:
+        self._shunt_data_to_use_in_network = value
+
+    @property
+    def gens_values_to_use_in_network(
+        self,
+    ) -> GenUpdatePayload:
+        """Target Q values and voltage regulation status for  generators (voltage_regulator_on=False) to apply when loading the network."""
+        return self._q_values_for_pq_gens or GenUpdatePayload(updates=[])
+
+    @gens_values_to_use_in_network.setter
+    def gens_values_to_use_in_network(self, value: GenUpdatePayload) -> None:
+        self._q_values_for_pq_gens = value
+
+    @property
+    def ratio_tap_changers_to_use_in_network(
+        self,
+    ) -> RatioTapChangerUpdatePayload | None:
+        """Ratio tap changers (classic transformers) to apply when loading the network."""
+        return self._ratio_tap_changers_to_use_in_network
+
+    @ratio_tap_changers_to_use_in_network.setter
+    def ratio_tap_changers_to_use_in_network(
+        self, value: RatioTapChangerUpdatePayload
+    ) -> None:
+        self._ratio_tap_changers_to_use_in_network = value
+
+    @property
+    def phase_tap_changers_to_use_in_network(
+        self,
+    ) -> PhaseTapChangerUpdatePayload | None:
+        """Phase tap changers (phase-shifting transformers) to apply when loading the network."""
+        return self._phase_tap_changers_to_use_in_network
+
+    @phase_tap_changers_to_use_in_network.setter
+    def phase_tap_changers_to_use_in_network(
+        self, value: PhaseTapChangerUpdatePayload
+    ) -> None:
+        self._phase_tap_changers_to_use_in_network = value
+
+    def init_tap_changers_from_network(self, network: Network) -> None:
+        """Initialise both tap changer properties from the current taps in the given network."""
+        phase_updates = []
+        for i, row in network.get_phase_tap_changers(all_attributes=True).iterrows():
+            tap = row["tap"]
+            phase_tap = network.get_phase_tap_changer_steps().loc[str(i), tap]
+            phase_update = PhaseTapChangerUpdate(
+                id=str(i),
+                tap=tap,
+                rho=phase_tap["rho"],  # type: ignore
+                alpha=phase_tap["alpha"],  # type: ignore
+                r=phase_tap["r"],  # type: ignore
+                x=phase_tap["x"],  # type: ignore
+                g=phase_tap["g"],  # type: ignore
+                b=phase_tap["b"],  # type: ignore
+                regulating=row["regulating"],
+                regulation_mode=row["regulation_mode"],
+                regulation_value=row["regulation_value"],
+                regulated_side=row["regulated_side"],
+                target_deadband=row["target_deadband"],
+            )
+            phase_updates.append(phase_update)
+        ratio_updates = []
+        for i, row in network.get_ratio_tap_changers(all_attributes=True).iterrows():
+            tap = row["tap"]
+            ratio_tap = network.get_ratio_tap_changer_steps().loc[str(i), tap]
+            ratio_update = RatioTapChangerUpdate(
+                id=str(i),
+                tap=tap,
+                rho=ratio_tap["rho"],  # type: ignore
+                r=ratio_tap["r"],  # type: ignore
+                x=ratio_tap["x"],  # type: ignore
+                g=ratio_tap["g"],  # type: ignore
+                b=ratio_tap["b"],  # type: ignore
+                regulating=row["regulating"],
+                oltc=row["oltc"],
+                regulated_side=row["regulated_side"],
+                target_deadband=row["target_deadband"],
+            )
+            ratio_updates.append(ratio_update)
+
+        self.phase_tap_changers_to_use_in_network = PhaseTapChangerUpdatePayload(
+            updates=phase_updates
+        )
+        self.ratio_tap_changers_to_use_in_network = RatioTapChangerUpdatePayload(
+            updates=ratio_updates
+        )
+
+    def init_shunt_data_from_network(self, network: Network) -> None:
+        """Initialise shunt properties from the current taps in the given network."""
+        self.shunt_data_to_use_in_network = ShuntUpdatePayload(
+            updates=[
+                ShuntUpdate(
+                    id=str(i),
+                    **{
+                        k: row[k]
+                        for k in ShuntUpdate.model_fields
+                        if k != "id" and k in row.index
+                    },
+                )
+                for i, row in network.get_shunt_compensators().iterrows()
+            ]
+        )
+
+    def init_gen_data_from_network(self, network: Network) -> None:
+        """Initialise generator values from the current generators in the given network."""
+        gens = network.get_generators(all_attributes=True)
+        self.gens_values_to_use_in_network = GenUpdatePayload(
+            updates=[
+                GenUpdate(
+                    id=str(i),
+                    target_q=row["target_q"],
+                    voltage_regulator_on=row["voltage_regulator_on"],
+                )
+                for i, row in gens.iterrows()
+            ]
+        )
+
+    @property
+    def network(self) -> Network | None:
         return self._grid.network if self._grid else None
 
-    def load_grid(self,
-                  path: Union[os.PathLike, str],
-                  filename: Optional[Union[os.PathLike, str]] = None) -> None:
+    def load_grid(
+        self,
+        path: Union[os.PathLike, str],
+        filename: Optional[Union[os.PathLike, str]] = None,
+    ) -> None:
         start_time = time.perf_counter()
+        full_path = self.make_complete_path(path, filename)
+        logger.info(f"Loading network from path {full_path}")
         cls = type(self)
         if hasattr(cls, "can_handle_more_than_2_busbar"):
             # grid2op version >= 1.10.0 then we use this
             self.can_handle_more_than_2_busbar()
-            
+
         if hasattr(cls, "can_handle_detachment"):
             # grid2op version >= 1.11.0 then we use this
             self.can_handle_detachment()
@@ -114,22 +283,24 @@ class PyPowSyBlBackend(Backend):
                 # default behaviour in grid2op before detachment is allowed
                 self._check_isolated_and_disconnected_injections = True
 
-        # load network
-        full_path = self.make_complete_path(path, filename)
-
-        logger.info(f"Loading network from '{full_path}'")
-
-        if full_path.endswith('.json'):
+        if full_path.endswith(".json"):
             n_pdp = pdp.from_json(full_path)
-            network = pp.network.convert_from_pandapower(n_pdp)
+            network = convert_from_pandapower(n_pdp)
         else:
-            network = pp.network.load(full_path)
+            network = load(full_path)
 
         self.load_grid_from_iidm(network)
-
-        end_time = time.perf_counter()
-        elapsed_time = (end_time - start_time) * 1000
-        logger.info(f"Network '{network.id}' loaded in {elapsed_time:.2f} ms")
+        logger.info(
+            f"Network loaded from path {full_path} in {(time.perf_counter() - start_time) * 1000}"
+        )
+        logger.info(
+            "Network topology: %d substations, %d loads, %d generators, %d lines, %d shunts",
+            self.n_sub,
+            self.n_load,
+            self.n_gen,
+            self.n_line,
+            self.n_shunt,
+        )
 
     def check_detachment_coherent(self):
         if self._check_isolated_and_disconnected_injections is None:
@@ -142,79 +313,264 @@ class PyPowSyBlBackend(Backend):
             # user provided something, I check if it's consistent
             if self._check_isolated_and_disconnected_injections:
                 if self.detachment_is_allowed:
-                    msg_ = ("You initialized the pypowsybl backend with \"check_isolated_and_disconnected_injections=True\" "
-                            "and the environment with \"allow_detachment=True\" which is not consistent. "
-                            "Discarding the call to env.make, the detachement is NOT supported for this env. "
-                            "If you want to support detachment, either initialize the pypowsybl backend with "
-                            "\"check_isolated_and_disconnected_injections=False\" or (preferably) with "
-                            "\"check_isolated_and_disconnected_injections=None\"")
+                    msg_ = (
+                        'You initialized the pypowsybl backend with "check_isolated_and_disconnected_injections=True" '
+                        'and the environment with "allow_detachment=True" which is not consistent. '
+                        "Discarding the call to env.make, the detachement is NOT supported for this env. "
+                        "If you want to support detachment, either initialize the pypowsybl backend with "
+                        '"check_isolated_and_disconnected_injections=False" or (preferably) with '
+                        '"check_isolated_and_disconnected_injections=None"'
+                    )
                     warnings.warn(msg_)
                     logger.warning(msg_)
                     type(self).detachment_is_allowed = False
                     self.detachment_is_allowed = False
             else:
                 if not self.detachment_is_allowed:
-                    msg_ = ("You initialized the pypowsybl backend with \"check_isolated_and_disconnected_injections=False\" "
-                            "and the environment with \"allow_detachment=False\" which is not consistent. "
-                            "The setting of \"check_isolated_and_disconnected_injections=False\" will have no effect. "
-                            "Detachment will NOT be supported. If you want so, please consider initializing pypowsybl backend with "
-                            "\"check_isolated_and_disconnected_injections=True\" or (preferably) with "
-                            "\"check_isolated_and_disconnected_injections=None\"")
+                    msg_ = (
+                        'You initialized the pypowsybl backend with "check_isolated_and_disconnected_injections=False" '
+                        'and the environment with "allow_detachment=False" which is not consistent. '
+                        'The setting of "check_isolated_and_disconnected_injections=False" will have no effect. '
+                        "Detachment will NOT be supported. If you want so, please consider initializing pypowsybl backend with "
+                        '"check_isolated_and_disconnected_injections=True" or (preferably) with '
+                        '"check_isolated_and_disconnected_injections=None"'
+                    )
                     warnings.warn(msg_)
                     logger.warning(msg_)
-                
-            
-    def load_grid_from_iidm(self, network: pp.network.Network) -> None:
+
+    def load_grid_from_iidm(self, network: Network) -> None:
+        """
+        NOTE: When loading a grid from iidm, if you have registered some elements to us in network
+        for ex. self.phase_tap_changers_to_use_in_network, that affect some elements in the loaded
+        network, they will be applied to update the values of those.
+        """
         if self._grid:
             self._grid.close()
             self._grid = None
 
-        self._grid = pp.grid2op.Backend(network,
-                                        self._consider_open_branch_reactive_flow,
-                                        self._check_isolated_and_disconnected_injections,
-                                        self.n_busbar_per_sub,
-                                        self._connect_all_elements_to_first_bus)
+        current_ratio_tap_changers, current_phase_tap_changers = (
+            network.get_ratio_tap_changers(all_attributes=True),
+            network.get_phase_tap_changers(all_attributes=True),
+        )
+        current_shunt_compensators = network.get_shunt_compensators()
+        current_generators = network.get_generators(all_attributes=True)
+
+        # Update phase tap changers...
+
+        n_phase = len(current_phase_tap_changers)
+        if self.phase_tap_changers_to_use_in_network:
+            phase_overrides = {
+                update.id
+                for update in self.phase_tap_changers_to_use_in_network.updates
+            }
+            phase_unchanged = [
+                str(i)
+                for i, _ in current_phase_tap_changers.iterrows()
+                if str(i) not in phase_overrides
+            ]
+            n_phase_overridden = n_phase - len(phase_unchanged)
+            logger.info(
+                f"Phase tap changers: {n_phase_overridden}/{n_phase} taps overridden via property"
+                + (f" ({100 * n_phase_overridden // n_phase}%)" if n_phase else "")
+            )
+            if phase_unchanged:
+                logger.info(
+                    f"Phase tap changers unchanged (using network values): {phase_unchanged}"
+                )
+            ids_to_consider = [
+                i for i in phase_overrides if i in current_phase_tap_changers.index
+            ]
+            df_enabling, df_disabling = (
+                self.phase_tap_changers_to_use_in_network.to_df()
+            )
+            network.update_phase_tap_changers(
+                df=df_enabling.loc[df_enabling.index.isin(ids_to_consider)]
+            )
+            network.update_phase_tap_changers(
+                df=df_disabling.loc[df_disabling.index.isin(ids_to_consider)]
+            )
+        else:
+            phase_overrides = {}
+            logger.info(
+                f"Phase tap changers: property not set, using all {n_phase} taps from network"
+            )
+
+        # Update ratio tap changers...
+
+        n_ratio = len(current_ratio_tap_changers)
+        if self.ratio_tap_changers_to_use_in_network:
+            ratio_overrides = {
+                update.id
+                for update in self.ratio_tap_changers_to_use_in_network.updates
+            }
+            ratio_unchanged = [
+                str(i)
+                for i, _ in current_ratio_tap_changers.iterrows()
+                if str(i) not in ratio_overrides
+            ]
+            n_ratio_overridden = n_ratio - len(ratio_unchanged)
+            logger.info(
+                f"Ratio tap changers: {n_ratio_overridden}/{n_ratio} taps overridden via property"
+                + (f" ({100 * n_ratio_overridden // n_ratio}%)" if n_ratio else "")
+            )
+            if ratio_unchanged:
+                logger.info(
+                    f"Ratio tap changers unchanged (using network values): {ratio_unchanged}"
+                )
+            ids_to_consider = [
+                i for i in ratio_overrides if i in current_ratio_tap_changers.index
+            ]
+            df_enabling, df_disabling = (
+                self.ratio_tap_changers_to_use_in_network.to_df()
+            )
+            network.update_ratio_tap_changers(
+                df=df_enabling.loc[df_enabling.index.isin(ids_to_consider)]
+            )
+            network.update_ratio_tap_changers(
+                df=df_disabling.loc[df_disabling.index.isin(ids_to_consider)]
+            )
+        else:
+            ratio_overrides = {}
+            logger.info(
+                f"Ratio tap changers: property not set, using all {n_ratio} taps from network"
+            )
+
+        # Update shunts...
+
+        n_shunt = len(current_shunt_compensators)
+        if self.shunt_data_to_use_in_network:
+            shunt_overrides = {
+                update.id for update in self.shunt_data_to_use_in_network.updates
+            }
+            shunt_unchanged = [
+                str(i)
+                for i, _ in current_shunt_compensators.iterrows()
+                if str(i) not in shunt_overrides
+            ]
+            n_shunt_overridden = n_shunt - len(shunt_unchanged)
+            logger.info(
+                f"Shunt compensators: {n_shunt_overridden}/{n_shunt} overridden via property"
+                + (f" ({100 * n_shunt_overridden // n_shunt}%)" if n_shunt else "")
+            )
+            if shunt_unchanged:
+                logger.info(
+                    f"Shunt compensators unchanged (using network values): {shunt_unchanged}"
+                )
+            ids_to_consider = [
+                i for i in shunt_overrides if i in current_shunt_compensators.index
+            ]
+            df = self.shunt_data_to_use_in_network.to_df()
+            network.update_shunt_compensators(df=df.loc[df.index.isin(ids_to_consider)])
+        else:
+            shunt_overrides = {}
+            logger.info(
+                f"Shunt compensators: property not set, using all {n_shunt} from network"
+            )
+
+        # Update gens...
+
+        n_gen = len(current_generators)
+        if self._q_values_for_pq_gens:
+            gens_overrides = {
+                update.id for update in self.gens_values_to_use_in_network.updates
+            }
+            gens_unchanged = [
+                str(i)
+                for i, _ in current_generators.iterrows()
+                if str(i) not in gens_overrides
+            ]
+            gen_overridden = n_gen - len(gens_unchanged)
+            logger.info(
+                f"Generators: {gen_overridden}/{n_gen} overridden via property"
+                + (f" ({100 * gen_overridden // n_gen}%)" if n_gen else "")
+            )
+            if gens_unchanged:
+                logger.info(
+                    f"Generators unchanged (using network values): {gens_unchanged}"
+                )
+            ids_to_consider = [
+                i for i in gens_overrides if i in current_generators.index
+            ]
+            df = self.gens_values_to_use_in_network.to_df()
+            network.update_generators(df=df.loc[df.index.isin(ids_to_consider)])
+        else:
+            gens_overrides = {}
+            logger.info(
+                f"Generators: property not set, using all {n_gen} from network"
+            )
+
+        # Done with elements updates
+
+        self._grid = PPBackend(
+            network,
+            self._consider_open_branch_reactive_flow,
+            self._check_isolated_and_disconnected_injections,  # type: ignore / cannot be None here
+            self.n_busbar_per_sub,
+            self._connect_all_elements_to_first_bus,
+        )
 
         # substations mapped to IIDM voltage levels
-        self.name_sub = self._grid.get_string_value(pp.grid2op.StringValueType.VOLTAGE_LEVEL_NAME)
-        self.n_sub = len(self.name_sub)
+        self.name_sub = self._grid.get_string_value(  # pyright: ignore[reportAttributeAccessIssue]
+            Grid2opStringValueType.VOLTAGE_LEVEL_NAME
+        )
+        self.n_sub = len(self.name_sub)  # pyright: ignore[reportAttributeAccessIssue]
 
         logger.info(f"{self.n_busbar_per_sub} busbars per substation")
 
         # loads
-        self.name_load = self._grid.get_string_value(pp.grid2op.StringValueType.LOAD_NAME)
-        self.n_load = len(self.name_load)
-        self.load_to_subid = self._grid.get_integer_value(pp.grid2op.IntegerValueType.LOAD_VOLTAGE_LEVEL_NUM)
+        self.name_load = self._grid.get_string_value(  # pyright: ignore[reportAttributeAccessIssue]
+            Grid2opStringValueType.LOAD_NAME
+        )
+        self.n_load = len(self.name_load)  # pyright: ignore[reportAttributeAccessIssue]
+        self.load_to_subid = self._grid.get_integer_value(  # pyright: ignore[reportAttributeAccessIssue]
+            Grid2opIntegerValueType.LOAD_VOLTAGE_LEVEL_NUM
+        )
 
         # generators
-        self.name_gen = self._grid.get_string_value(pp.grid2op.StringValueType.GENERATOR_NAME)
-        self.n_gen = len(self.name_gen)
-        self.gen_to_subid = self._grid.get_integer_value(pp.grid2op.IntegerValueType.GENERATOR_VOLTAGE_LEVEL_NUM)
+        self.name_gen = self._grid.get_string_value(  # pyright: ignore[reportAttributeAccessIssue]
+            Grid2opStringValueType.GENERATOR_NAME
+        )
+        self.n_gen = len(self.name_gen)  # pyright: ignore[reportAttributeAccessIssue]
+        self.gen_to_subid = self._grid.get_integer_value(  # pyright: ignore[reportAttributeAccessIssue]
+            Grid2opIntegerValueType.GENERATOR_VOLTAGE_LEVEL_NUM
+        )
 
         # shunts
-        self.name_shunt = self._grid.get_string_value(pp.grid2op.StringValueType.SHUNT_NAME)
-        self.n_shunt = len(self.name_shunt)
-        self.shunt_to_subid = self._grid.get_integer_value(pp.grid2op.IntegerValueType.SHUNT_VOLTAGE_LEVEL_NUM)
+        self.name_shunt = self._grid.get_string_value(  # pyright: ignore[reportAttributeAccessIssue]
+            Grid2opStringValueType.SHUNT_NAME
+        )
+        self.n_shunt = len(self.name_shunt)  # pyright: ignore[reportAttributeAccessIssue]
+        self.shunt_to_subid = self._grid.get_integer_value(  # pyright: ignore[reportAttributeAccessIssue]
+            Grid2opIntegerValueType.SHUNT_VOLTAGE_LEVEL_NUM
+        )
 
         # batteries
         self.set_no_storage()
-        self.n_storage = 0
+        self.n_storage = 0  # pyright: ignore[reportAttributeAccessIssue]
         # FIXME implement batteries
         # self.name_storage = np.array(self._grid.get_string_value(pp.grid2op.StringValueType.BATTERY_NAME))
         # self.n_storage = len(self.name_storage)
         # self.storage_type = np.full(self.n_storage, fill_value="???")
-        # self.storage_to_subid = self._grid.get_integer_value(pp.grid2op.IntegerValueType.BATTERY_VOLTAGE_LEVEL_NUM).copy()
+        # self.storage_to_subid = self._grid.get_integer_value(Grid2opIntegerValueType.BATTERY_VOLTAGE_LEVEL_NUM).copy()
 
         # lines and transformers
-        self.name_line = self._grid.get_string_value(pp.grid2op.StringValueType.BRANCH_NAME)
-        self.n_line = len(self.name_line)
-        self.line_or_to_subid = self._grid.get_integer_value(pp.grid2op.IntegerValueType.BRANCH_VOLTAGE_LEVEL_NUM_1)
-        self.line_ex_to_subid = self._grid.get_integer_value(pp.grid2op.IntegerValueType.BRANCH_VOLTAGE_LEVEL_NUM_2)
+        self.name_line = self._grid.get_string_value(  # pyright: ignore[reportAttributeAccessIssue]
+            Grid2opStringValueType.BRANCH_NAME
+        )
+        self.n_line = len(self.name_line)  # pyright: ignore[reportAttributeAccessIssue]
+        self.line_or_to_subid = self._grid.get_integer_value(  # pyright: ignore[reportAttributeAccessIssue]
+            Grid2opIntegerValueType.BRANCH_VOLTAGE_LEVEL_NUM_1
+        )
+        self.line_ex_to_subid = self._grid.get_integer_value(  # pyright: ignore[reportAttributeAccessIssue]
+            Grid2opIntegerValueType.BRANCH_VOLTAGE_LEVEL_NUM_2
+        )
 
         self._compute_pos_big_topo()
 
         # thermal limits
-        self.thermal_limit_a = self._grid.get_double_value(pp.grid2op.DoubleValueType.BRANCH_PERMANENT_LIMIT_A)
+        self.thermal_limit_a = self._grid.get_double_value(  # pyright: ignore[reportAttributeAccessIssue]
+            Grid2opDoubleValueType.BRANCH_PERMANENT_LIMIT_A
+        )
 
         # cached data
         self._gen_p = np.empty(self.n_gen, dtype=dt_float)
@@ -249,53 +605,100 @@ class PyPowSyBlBackend(Backend):
         self._topo_vect = np.empty(self.dim_topo, dtype=dt_int)
         self.fetch_data()
 
-    def apply_action(self, backend_action: Union["grid2op.Action._backendAction._BackendAction", None]) -> None:
+    def apply_action(
+        self,
+        backend_action: Union[_BackendAction, None],
+    ) -> None:
         # the following few lines are highly recommended
         if backend_action is None:
             return
 
-        logger.info("Applying action")
+        logger.debug("Applying action to grid...")
 
         start_time = time.time()
 
-        self._grid.update_double_value(pp.grid2op.UpdateDoubleValueType.UPDATE_LOAD_P, backend_action.load_p.values, backend_action.load_p.changed)
-        self._grid.update_double_value(pp.grid2op.UpdateDoubleValueType.UPDATE_LOAD_Q, backend_action.load_q.values, backend_action.load_q.changed)
-        self._grid.update_double_value(pp.grid2op.UpdateDoubleValueType.UPDATE_GENERATOR_P, backend_action.prod_p.values, backend_action.prod_p.changed)
-        self._grid.update_double_value(pp.grid2op.UpdateDoubleValueType.UPDATE_GENERATOR_V, backend_action.prod_v.values, backend_action.prod_v.changed)
+        self._grid.update_double_value(
+            Grid2opUpdateDoubleValueType.UPDATE_LOAD_P,
+            backend_action.load_p.values,
+            backend_action.load_p.changed,
+        )
+        self._grid.update_double_value(
+            Grid2opUpdateDoubleValueType.UPDATE_LOAD_Q,
+            backend_action.load_q.values,
+            backend_action.load_q.changed,
+        )
+        self._grid.update_double_value(
+            Grid2opUpdateDoubleValueType.UPDATE_GENERATOR_P,
+            backend_action.prod_p.values,
+            backend_action.prod_p.changed,
+        )
+        self._grid.update_double_value(
+            Grid2opUpdateDoubleValueType.UPDATE_GENERATOR_V,
+            backend_action.prod_v.values,
+            backend_action.prod_v.changed,
+        )
         # TODO shunts
 
         loads_bus = backend_action.get_loads_bus()
-        self._grid.update_integer_value(pp.grid2op.UpdateIntegerValueType.UPDATE_LOAD_BUS, loads_bus.values, loads_bus.changed)
+        self._grid.update_integer_value(
+            Grid2opUpdateIntegerValueType.UPDATE_LOAD_BUS,
+            loads_bus.values,
+            loads_bus.changed,
+        )
         generators_bus = backend_action.get_gens_bus()
-        self._grid.update_integer_value(pp.grid2op.UpdateIntegerValueType.UPDATE_GENERATOR_BUS, generators_bus.values, generators_bus.changed)
+        self._grid.update_integer_value(
+            Grid2opUpdateIntegerValueType.UPDATE_GENERATOR_BUS,
+            generators_bus.values,
+            generators_bus.changed,
+        )
         shunt_bus = backend_action.shunt_bus
-        self._grid.update_integer_value(pp.grid2op.UpdateIntegerValueType.UPDATE_SHUNT_BUS, shunt_bus.values, shunt_bus.changed)
+        self._grid.update_integer_value(
+            Grid2opUpdateIntegerValueType.UPDATE_SHUNT_BUS,
+            shunt_bus.values,
+            shunt_bus.changed,
+        )
         lines_or_bus = backend_action.get_lines_or_bus()
-        self._grid.update_integer_value(pp.grid2op.UpdateIntegerValueType.UPDATE_BRANCH_BUS1, lines_or_bus.values, lines_or_bus.changed)
+        self._grid.update_integer_value(
+            Grid2opUpdateIntegerValueType.UPDATE_BRANCH_BUS1,
+            lines_or_bus.values,
+            lines_or_bus.changed,
+        )
         lines_ex_bus = backend_action.get_lines_ex_bus()
-        self._grid.update_integer_value(pp.grid2op.UpdateIntegerValueType.UPDATE_BRANCH_BUS2, lines_ex_bus.values, lines_ex_bus.changed)
+        self._grid.update_integer_value(
+            Grid2opUpdateIntegerValueType.UPDATE_BRANCH_BUS2,
+            lines_ex_bus.values,
+            lines_ex_bus.changed,
+        )
 
         end_time = time.time()
         elapsed_time = (end_time - start_time) * 1000
-        logger.info(f"Action applied in {elapsed_time:.2f} ms")
+        logger.debug(f"Action applied in {elapsed_time:.2f} ms")
 
     @staticmethod
-    def _is_converged(result: pp.loadflow.ComponentResult) -> bool:
-        return result.status == pp.loadflow.ComponentStatus.CONVERGED or result.status == pp.loadflow.ComponentStatus.NO_CALCULATION
+    def _is_converged(result: ComponentResult) -> bool:
+        return (
+            result.status == LoadFlowComponentStatus.CONVERGED
+            or result.status == LoadFlowComponentStatus.NO_CALCULATION
+        )
 
     def runpf(self, is_dc: bool = False) -> Tuple[bool, Union[Exception, None]]:
-        logger.info(f"Running {'DC' if is_dc else 'AC'} powerflow")
+        logger.debug(f"Running {'DC' if is_dc else 'AC'} powerflow")
 
         start_time = time.perf_counter()
 
-        if self._check_isolated_and_disconnected_injections and self._grid.check_isolated_and_disconnected_injections():
+        if (
+            self._check_isolated_and_disconnected_injections
+            and self._grid.check_isolated_and_disconnected_injections()
+        ):
             converged = False
+            converged_msg = f"Issue with _check_isolated_and_disconnected_injections : {self._check_isolated_and_disconnected_injections} and {self._grid.check_isolated_and_disconnected_injections()}"
         else:
             beg_ = time.perf_counter()
             results = self._grid.run_pf(is_dc, self._lf_parameters)
             end_ = time.perf_counter()
             self.comp_time += end_ - beg_
             converged = self._is_converged(results[0])
+            converged_msg = results[0].status_text
 
         if not converged:
             self.set_all_nans()
@@ -305,7 +708,7 @@ class PyPowSyBlBackend(Backend):
         end_time = time.perf_counter()
         elapsed_time = (end_time - start_time) * 1000
         logger.info(f"Powerflow ran in {elapsed_time:.2f} ms")
-        return converged, None if converged else DivergingPowerflow()
+        return converged, None if converged else DivergingPowerflow(converged_msg)
 
     def fetch_data(self):
         self._fetch_topo_vect()
@@ -347,70 +750,95 @@ class PyPowSyBlBackend(Backend):
 
         self._topo_vect[:] = -1
 
-    def get_topo_vect(self)-> np.ndarray:
+    def get_topo_vect(self) -> np.ndarray:
         return 1 * self._topo_vect
 
     def _fetch_topo_vect(self):
-        self._topo_vect[:] = self._grid.get_integer_value(pp.grid2op.IntegerValueType.TOPO_VECT)
+        self._topo_vect[:] = self._grid.get_integer_value(
+            Grid2opIntegerValueType.TOPO_VECT
+        )
 
     def generators_info(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        return 1 * self._gen_p, 1* self._gen_q, 1* self._gen_v
+        return 1 * self._gen_p, 1 * self._gen_q, 1 * self._gen_v
 
     def _fetch_gen(self):
-        self._gen_p = self._grid.get_double_value(pp.grid2op.DoubleValueType.GENERATOR_P)
-        self._gen_q = self._grid.get_double_value(pp.grid2op.DoubleValueType.GENERATOR_Q)
-        self._gen_v = self._grid.get_double_value(pp.grid2op.DoubleValueType.GENERATOR_V)
-        self._gen_theta = self._grid.get_double_value(pp.grid2op.DoubleValueType.GENERATOR_ANGLE)
+        self._gen_p = self._grid.get_double_value(Grid2opDoubleValueType.GENERATOR_P)
+        self._gen_q = self._grid.get_double_value(Grid2opDoubleValueType.GENERATOR_Q)
+        self._gen_v = self._grid.get_double_value(Grid2opDoubleValueType.GENERATOR_V)
+        self._gen_theta = self._grid.get_double_value(
+            Grid2opDoubleValueType.GENERATOR_ANGLE
+        )
 
     def loads_info(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        return 1. * self._load_p, 1.* self._load_q, 1. * self._load_v
+        return 1.0 * self._load_p, 1.0 * self._load_q, 1.0 * self._load_v
 
     def _fetch_load(self):
-        self._load_p[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.LOAD_P)
-        self._load_q[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.LOAD_Q)
-        self._load_v[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.LOAD_V)
-        self._load_theta[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.LOAD_ANGLE)
+        self._load_p[:] = self._grid.get_double_value(Grid2opDoubleValueType.LOAD_P)
+        self._load_q[:] = self._grid.get_double_value(Grid2opDoubleValueType.LOAD_Q)
+        self._load_v[:] = self._grid.get_double_value(Grid2opDoubleValueType.LOAD_V)
+        self._load_theta[:] = self._grid.get_double_value(
+            Grid2opDoubleValueType.LOAD_ANGLE
+        )
 
     def shunt_info(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        return 1. * self._shunt_p, 1. * self._shunt_q, 1. * self._shunt_v, 1 * self._shunt_bus
+        return (
+            1.0 * self._shunt_p,
+            1.0 * self._shunt_q,
+            1.0 * self._shunt_v,
+            1 * self._shunt_bus,
+        )
 
     def _fetch_shunt(self):
-        self._shunt_p[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.SHUNT_P)
-        self._shunt_q[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.SHUNT_Q)
-        self._shunt_v[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.SHUNT_V)
-        self._shunt_bus[:] = self._grid.get_integer_value(pp.grid2op.IntegerValueType.SHUNT_LOCAL_BUS)
+        self._shunt_p[:] = self._grid.get_double_value(Grid2opDoubleValueType.SHUNT_P)
+        self._shunt_q[:] = self._grid.get_double_value(Grid2opDoubleValueType.SHUNT_Q)
+        self._shunt_v[:] = self._grid.get_double_value(Grid2opDoubleValueType.SHUNT_V)
+        self._shunt_bus[:] = self._grid.get_integer_value(
+            Grid2opIntegerValueType.SHUNT_LOCAL_BUS
+        )
 
     def lines_or_info(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        return 1. * self._por, 1. * self._qor, 1. * self._vor, 1. * self._aor
+        return 1.0 * self._por, 1.0 * self._qor, 1.0 * self._vor, 1.0 * self._aor
 
     def _fetch_line_or(self):
-        self._por[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.BRANCH_P1)
-        self._qor[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.BRANCH_Q1)
-        self._vor[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.BRANCH_V1)
-        self._aor[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.BRANCH_I1)
-        self._line_or_theta[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.BRANCH_ANGLE1)
+        self._por[:] = self._grid.get_double_value(Grid2opDoubleValueType.BRANCH_P1)
+        self._qor[:] = self._grid.get_double_value(Grid2opDoubleValueType.BRANCH_Q1)
+        self._vor[:] = self._grid.get_double_value(Grid2opDoubleValueType.BRANCH_V1)
+        self._aor[:] = self._grid.get_double_value(Grid2opDoubleValueType.BRANCH_I1)
+        self._line_or_theta[:] = self._grid.get_double_value(
+            Grid2opDoubleValueType.BRANCH_ANGLE1
+        )
 
     def lines_ex_info(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        return 1. * self._pex, 1. * self._qex, 1. * self._vex, 1. * self._aex
+        return 1.0 * self._pex, 1.0 * self._qex, 1.0 * self._vex, 1.0 * self._aex
 
     def _fetch_line_ex(self):
-        self._pex[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.BRANCH_P2)
-        self._qex[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.BRANCH_Q2)
-        self._vex[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.BRANCH_V2)
-        self._aex[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.BRANCH_I2)
-        self._line_ex_theta[:] = self._grid.get_double_value(pp.grid2op.DoubleValueType.BRANCH_ANGLE2)
+        self._pex[:] = self._grid.get_double_value(Grid2opDoubleValueType.BRANCH_P2)
+        self._qex[:] = self._grid.get_double_value(Grid2opDoubleValueType.BRANCH_Q2)
+        self._vex[:] = self._grid.get_double_value(Grid2opDoubleValueType.BRANCH_V2)
+        self._aex[:] = self._grid.get_double_value(Grid2opDoubleValueType.BRANCH_I2)
+        self._line_ex_theta[:] = self._grid.get_double_value(
+            Grid2opDoubleValueType.BRANCH_ANGLE2
+        )
 
-    def get_theta(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        return 1. * self._line_or_theta, \
-               1. * self._line_ex_theta, \
-               1. * self._load_theta, \
-               1. * self._gen_theta, \
-               1. * self._storage_theta
+    def get_theta(  # type: ignore We return the storage as well
+        self,
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        return (
+            1.0 * self._line_or_theta,
+            1.0 * self._line_ex_theta,
+            1.0 * self._load_theta,
+            1.0 * self._gen_theta,
+            1.0 * self._storage_theta,
+        )
 
-    def reset(self,
-              path : Union[os.PathLike, str],
-              grid_filename : Optional[Union[os.PathLike, str]]=None) -> None:
-        logger.info("Reset backend")
+    def reset(
+        self,
+        path: Union[os.PathLike, str],
+        grid_filename: Optional[Union[os.PathLike, str]] = None,
+    ) -> None:
+        logger.info(
+            f"Backend is being reset and grid will be reloaded from path {path}"
+        )
         self.load_grid(path, filename=grid_filename)
 
     def close(self) -> None:
