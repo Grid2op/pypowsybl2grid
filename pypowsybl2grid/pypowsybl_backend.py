@@ -35,10 +35,10 @@ from pypowsybl.network.impl.pandapower_converter import convert_from_pandapower
 from pypowsybl.network.impl.util import get_import_supported_extensions
 
 from pypowsybl2grid.models import (
-    GensUpdatePayload,
+    GenUpdate,
+    GenUpdatePayload,
     PhaseTapChangerUpdate,
     PhaseTapChangerUpdatePayload,
-    QUpdate,
     RatioTapChangerUpdate,
     RatioTapChangerUpdatePayload,
     ShuntUpdate,
@@ -97,7 +97,7 @@ class PyPowSyBlBackend(Backend):
             RatioTapChangerUpdatePayload | None
         ) = None
         self._shunt_data_to_use_in_network: ShuntUpdatePayload | None = None
-        self._q_values_for_pq_gens: GensUpdatePayload | None = None
+        self._q_values_for_pq_gens: GenUpdatePayload | None = None
 
         # caching of the results
         self._gen_p: np.ndarray = np.empty(0, dtype=dt_float)
@@ -145,12 +145,12 @@ class PyPowSyBlBackend(Backend):
     @property
     def gens_values_to_use_in_network(
         self,
-    ) -> GensUpdatePayload:
+    ) -> GenUpdatePayload:
         """Target Q values and voltage regulation status for  generators (voltage_regulator_on=False) to apply when loading the network."""
-        return self._q_values_for_pq_gens or GensUpdatePayload(updates=[])
+        return self._q_values_for_pq_gens or GenUpdatePayload(updates=[])
 
     @gens_values_to_use_in_network.setter
-    def gens_values_to_use_in_network(self, value: GensUpdatePayload) -> None:
+    def gens_values_to_use_in_network(self, value: GenUpdatePayload) -> None:
         self._q_values_for_pq_gens = value
 
     @property
@@ -243,12 +243,12 @@ class PyPowSyBlBackend(Backend):
             ]
         )
 
-    def init_pq_gen_q_from_network(self, network: Network) -> None:
-        """Initialise PQ generator Q values from the current generators in the given network."""
+    def init_gen_data_from_network(self, network: Network) -> None:
+        """Initialise generator values from the current generators in the given network."""
         gens = network.get_generators(all_attributes=True)
-        self.gens_values_to_use_in_network = GensUpdatePayload(
+        self.gens_values_to_use_in_network = GenUpdatePayload(
             updates=[
-                QUpdate(
+                GenUpdate(
                     id=str(i),
                     target_q=row["target_q"],
                     voltage_regulator_on=row["voltage_regulator_on"],
@@ -256,65 +256,6 @@ class PyPowSyBlBackend(Backend):
                 for i, row in gens.iterrows()
             ]
         )
-
-    def _update_backend_network_gens_q_with_pq_gen_q_values(self) -> None:
-        """
-        This updates the grid2op backend held Network with the
-        data stored in self.q_values_for_pq_gens.
-        """
-        if not self.network:
-            raise ValueError(
-                "self.network is None, you should have a self.network before trying to update generator Q values on it."
-            )
-        q_data = self.gens_values_to_use_in_network
-        if q_data.updates:
-            self.network.update_generators(df=q_data.to_df())
-
-    def _update_backend_network_taps_with_taps_to_use_in_network(self) -> None:
-        """
-        This updates the grid2op backend held Network with the
-        data store in self.taps_to_use_in_network.
-        """
-        if (
-            not self.phase_tap_changers_to_use_in_network
-            or not self.ratio_tap_changers_to_use_in_network
-        ):
-            raise ValueError(
-                "You should set self.phase_tap_changers_to_use_in_network and self.ratio_tap_changers_to_use_in_network"
-            )
-        if self.network:
-            self.network.update_phase_tap_changers(
-                df=self.phase_tap_changers_to_use_in_network.to_df()[0]
-            )
-            self.network.update_phase_tap_changers(
-                df=self.phase_tap_changers_to_use_in_network.to_df()[1]
-            )
-            self.network.update_ratio_tap_changers(
-                df=self.ratio_tap_changers_to_use_in_network.to_df()[0]
-            )
-            self.network.update_ratio_tap_changers(
-                df=self.ratio_tap_changers_to_use_in_network.to_df()[1]
-            )
-        else:
-            raise ValueError(
-                "self.network is None, you should have a self.network before trying to update taps on it."
-            )
-
-    def _update_backend_network_shunt_with_shunt_data_to_use_in_network(self) -> None:
-        """
-        This updates the grid2op backend held Network with the
-        data store in self.taps_to_use_in_network.
-        """
-        if not self.shunt_data_to_use_in_network:
-            raise ValueError("You should set self.shunt_data_to_use_in_network")
-        if self.network:
-            self.network.update_shunt_compensators(
-                df=self.shunt_data_to_use_in_network.to_df()
-            )
-        else:
-            raise ValueError(
-                "self.network is None, you should have a self.network before trying to update shunts on it."
-            )
 
     @property
     def network(self) -> Network | None:

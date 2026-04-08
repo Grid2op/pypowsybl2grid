@@ -101,14 +101,14 @@ class ShuntUpdatePayload(BaseModel):
         return [u.model_dump(exclude_none=True) for u in self.updates]
 
 
-class QUpdate(BaseModel):
+class GenUpdate(BaseModel):
     id: str
     target_q: float
     voltage_regulator_on: bool
 
 
-class GensUpdatePayload(BaseModel):
-    updates: list[QUpdate]
+class GenUpdatePayload(BaseModel):
+    updates: list[GenUpdate]
 
     def to_df(self):
         return pd.DataFrame([u.model_dump() for u in self.updates]).set_index("id")
