@@ -6,6 +6,7 @@ class PhaseTapChangerUpdate(BaseModel):
     id: str
     tap: int
     rho: float
+    alpha: float
     r: float
     x: float
     g: float
@@ -32,7 +33,7 @@ class RatioTapChangerUpdate(BaseModel):
     target_deadband: float | None = None
 
 
-_STEP_FIELDS = {"rho", "r", "x", "g", "b"}
+_STEP_FIELDS = {"rho", "alpha", "r", "x", "g", "b"}
 
 
 class PhaseTapChangerUpdatePayload(BaseModel):
@@ -106,7 +107,7 @@ class QUpdate(BaseModel):
     voltage_regulator_on: bool
 
 
-class QUpdatePayload(BaseModel):
+class GensUpdatePayload(BaseModel):
     updates: list[QUpdate]
 
     def to_df(self):

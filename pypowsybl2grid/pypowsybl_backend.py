@@ -35,10 +35,10 @@ from pypowsybl.network.impl.pandapower_converter import convert_from_pandapower
 from pypowsybl.network.impl.util import get_import_supported_extensions
 
 from pypowsybl2grid.models import (
+    GensUpdatePayload,
     PhaseTapChangerUpdate,
     PhaseTapChangerUpdatePayload,
     QUpdate,
-    QUpdatePayload,
     RatioTapChangerUpdate,
     RatioTapChangerUpdatePayload,
     ShuntUpdate,
@@ -97,7 +97,7 @@ class PyPowSyBlBackend(Backend):
             RatioTapChangerUpdatePayload | None
         ) = None
         self._shunt_data_to_use_in_network: ShuntUpdatePayload | None = None
-        self._q_values_for_pq_gens: QUpdatePayload | None = None
+        self._q_values_for_pq_gens: GensUpdatePayload | None = None
 
         # caching of the results
         self._gen_p: np.ndarray = np.empty(0, dtype=dt_float)
@@ -143,14 +143,14 @@ class PyPowSyBlBackend(Backend):
         self._shunt_data_to_use_in_network = value
 
     @property
-    def q_values_for_pq_gens(
+    def gens_values_to_use_in_network(
         self,
-    ) -> QUpdatePayload:
-        """Target Q values for PQ generators (voltage_regulator_on=False) to apply when loading the network."""
-        return self._q_values_for_pq_gens or QUpdatePayload(updates=[])
+    ) -> GensUpdatePayload:
+        """Target Q values and voltage regulation status for  generators (voltage_regulator_on=False) to apply when loading the network."""
+        return self._q_values_for_pq_gens or GensUpdatePayload(updates=[])
 
-    @q_values_for_pq_gens.setter
-    def q_values_for_pq_gens(self, value: QUpdatePayload) -> None:
+    @gens_values_to_use_in_network.setter
+    def gens_values_to_use_in_network(self, value: GensUpdatePayload) -> None:
         self._q_values_for_pq_gens = value
 
     @property
@@ -181,20 +181,19 @@ class PyPowSyBlBackend(Backend):
 
     def init_tap_changers_from_network(self, network: Network) -> None:
         """Initialise both tap changer properties from the current taps in the given network."""
-        phase_tap_steps = network.get_phase_tap_changer_steps()
-        ratio_tap_steps = network.get_ratio_tap_changer_steps()
         phase_updates = []
         for i, row in network.get_phase_tap_changers(all_attributes=True).iterrows():
             tap = row["tap"]
-            phase_tap = phase_tap_steps.loc[str(i), tap]
+            phase_tap = network.get_phase_tap_changer_steps().loc[str(i), tap]
             phase_update = PhaseTapChangerUpdate(
                 id=str(i),
                 tap=tap,
-                rho=phase_tap["rho"], # type: ignore
-                r=phase_tap["r"], # type: ignore
-                x=phase_tap["x"], # type: ignore
-                g=phase_tap["g"], # type: ignore
-                b=phase_tap["b"], # type: ignore
+                rho=phase_tap["rho"],  # type: ignore
+                alpha=phase_tap["alpha"],  # type: ignore
+                r=phase_tap["r"],  # type: ignore
+                x=phase_tap["x"],  # type: ignore
+                g=phase_tap["g"],  # type: ignore
+                b=phase_tap["b"],  # type: ignore
                 regulating=row["regulating"],
                 regulation_mode=row["regulation_mode"],
                 regulation_value=row["regulation_value"],
@@ -205,15 +204,15 @@ class PyPowSyBlBackend(Backend):
         ratio_updates = []
         for i, row in network.get_ratio_tap_changers(all_attributes=True).iterrows():
             tap = row["tap"]
-            ratio_tap = ratio_tap_steps.loc[str(i), tap]
+            ratio_tap = network.get_ratio_tap_changer_steps().loc[str(i), tap]
             ratio_update = RatioTapChangerUpdate(
                 id=str(i),
                 tap=tap,
-                rho=ratio_tap["rho"], # type: ignore
-                r=ratio_tap["r"], # type: ignore
-                x=ratio_tap["x"], # type: ignore
-                g=ratio_tap["g"], # type: ignore
-                b=ratio_tap["b"], # type: ignore
+                rho=ratio_tap["rho"],  # type: ignore
+                r=ratio_tap["r"],  # type: ignore
+                x=ratio_tap["x"],  # type: ignore
+                g=ratio_tap["g"],  # type: ignore
+                b=ratio_tap["b"],  # type: ignore
                 regulating=row["regulating"],
                 oltc=row["oltc"],
                 regulated_side=row["regulated_side"],
@@ -247,7 +246,7 @@ class PyPowSyBlBackend(Backend):
     def init_pq_gen_q_from_network(self, network: Network) -> None:
         """Initialise PQ generator Q values from the current generators in the given network."""
         gens = network.get_generators(all_attributes=True)
-        self.q_values_for_pq_gens = QUpdatePayload(
+        self.gens_values_to_use_in_network = GensUpdatePayload(
             updates=[
                 QUpdate(
                     id=str(i),
@@ -267,7 +266,7 @@ class PyPowSyBlBackend(Backend):
             raise ValueError(
                 "self.network is None, you should have a self.network before trying to update generator Q values on it."
             )
-        q_data = self.q_values_for_pq_gens
+        q_data = self.gens_values_to_use_in_network
         if q_data.updates:
             self.network.update_generators(df=q_data.to_df())
 
@@ -399,6 +398,11 @@ class PyPowSyBlBackend(Backend):
                     logger.warning(msg_)
 
     def load_grid_from_iidm(self, network: Network) -> None:
+        """
+        NOTE: When loading a grid from iidm, if you have registered some elements to us in network
+        for ex. self.phase_tap_changers_to_use_in_network, that affect some elements in the loaded
+        network, they will be applied to update the values of those.
+        """
         if self._grid:
             self._grid.close()
             self._grid = None
@@ -407,22 +411,15 @@ class PyPowSyBlBackend(Backend):
             network.get_ratio_tap_changers(all_attributes=True),
             network.get_phase_tap_changers(all_attributes=True),
         )
-        current_phase_tap_steps = network.get_phase_tap_changer_steps(
-            all_attributes=True
-        )
-        current_ratio_tap_steps = network.get_ratio_tap_changer_steps(
-            all_attributes=True
-        )
         current_shunt_compensators = network.get_shunt_compensators()
         current_generators = network.get_generators(all_attributes=True)
-        current_pq_generators = current_generators[
-            ~current_generators["voltage_regulator_on"]
-        ]
+
+        # Update phase tap changers...
 
         n_phase = len(current_phase_tap_changers)
         if self.phase_tap_changers_to_use_in_network:
             phase_overrides = {
-                update.id: update.model_dump(exclude_none=True, exclude={"id"})
+                update.id
                 for update in self.phase_tap_changers_to_use_in_network.updates
             }
             phase_unchanged = [
@@ -439,37 +436,30 @@ class PyPowSyBlBackend(Backend):
                 logger.info(
                     f"Phase tap changers unchanged (using network values): {phase_unchanged}"
                 )
+            ids_to_consider = [
+                i for i in phase_overrides if i in current_phase_tap_changers.index
+            ]
+            df_enabling, df_disabling = (
+                self.phase_tap_changers_to_use_in_network.to_df()
+            )
+            network.update_phase_tap_changers(
+                df=df_enabling.loc[df_enabling.index.isin(ids_to_consider)]
+            )
+            network.update_phase_tap_changers(
+                df=df_disabling.loc[df_disabling.index.isin(ids_to_consider)]
+            )
         else:
             phase_overrides = {}
             logger.info(
                 f"Phase tap changers: property not set, using all {n_phase} taps from network"
             )
 
-        phase_updates = []
-        for i, row in network.get_phase_tap_changers(all_attributes=True).iterrows():
-            phase_update = PhaseTapChangerUpdate(
-                id=str(i),
-                tap=row["tap"],
-                rho=current_phase_tap_steps.loc[str(i)]["rho"].values[0],
-                r=current_phase_tap_steps.loc[str(i)]["r"].values[0],
-                x=current_phase_tap_steps.loc[str(i)]["x"].values[0],
-                g=current_phase_tap_steps.loc[str(i)]["g"].values[0],
-                b=current_phase_tap_steps.loc[str(i)]["b"].values[0],
-                regulating=row["regulating"],
-                regulation_mode=row["regulation_mode"],
-                regulation_value=row["regulation_value"],
-                regulated_side=row["regulated_side"],
-                target_deadband=row["target_deadband"],
-            )
-            phase_updates.append(phase_update)
-        self.phase_tap_changers_to_use_in_network = PhaseTapChangerUpdatePayload(
-            updates=phase_updates
-        )
+        # Update ratio tap changers...
 
         n_ratio = len(current_ratio_tap_changers)
         if self.ratio_tap_changers_to_use_in_network:
             ratio_overrides = {
-                update.id: update.model_dump(exclude_none=True, exclude={"id"})
+                update.id
                 for update in self.ratio_tap_changers_to_use_in_network.updates
             }
             ratio_unchanged = [
@@ -486,37 +476,30 @@ class PyPowSyBlBackend(Backend):
                 logger.info(
                     f"Ratio tap changers unchanged (using network values): {ratio_unchanged}"
                 )
+            ids_to_consider = [
+                i for i in ratio_overrides if i in current_ratio_tap_changers.index
+            ]
+            df_enabling, df_disabling = (
+                self.ratio_tap_changers_to_use_in_network.to_df()
+            )
+            network.update_ratio_tap_changers(
+                df=df_enabling.loc[df_enabling.index.isin(ids_to_consider)]
+            )
+            network.update_ratio_tap_changers(
+                df=df_disabling.loc[df_disabling.index.isin(ids_to_consider)]
+            )
         else:
             ratio_overrides = {}
             logger.info(
                 f"Ratio tap changers: property not set, using all {n_ratio} taps from network"
             )
 
-        ratio_updates = []
-        for i, row in network.get_ratio_tap_changers(all_attributes=True).iterrows():
-            ratio_update = RatioTapChangerUpdate(
-                id=str(i),
-                tap=row["tap"],
-                rho=current_ratio_tap_steps.loc[str(i)]["rho"].values[0],
-                r=current_ratio_tap_steps.loc[str(i)]["r"].values[0],
-                x=current_ratio_tap_steps.loc[str(i)]["x"].values[0],
-                g=current_ratio_tap_steps.loc[str(i)]["g"].values[0],
-                b=current_ratio_tap_steps.loc[str(i)]["b"].values[0],
-                regulating=row["regulating"],
-                oltc=row["oltc"],
-                regulated_side=row["regulated_side"],
-                target_deadband=row["target_deadband"],
-            )
-            ratio_updates.append(ratio_update)
+        # Update shunts...
 
-        self.ratio_tap_changers_to_use_in_network = RatioTapChangerUpdatePayload(
-            updates=ratio_updates
-        )
         n_shunt = len(current_shunt_compensators)
         if self.shunt_data_to_use_in_network:
             shunt_overrides = {
-                update.id: update.model_dump(exclude={"id"})
-                for update in self.shunt_data_to_use_in_network.updates
+                update.id for update in self.shunt_data_to_use_in_network.updates
             }
             shunt_unchanged = [
                 str(i)
@@ -532,69 +515,50 @@ class PyPowSyBlBackend(Backend):
                 logger.info(
                     f"Shunt compensators unchanged (using network values): {shunt_unchanged}"
                 )
+            ids_to_consider = [
+                i for i in shunt_overrides if i in current_shunt_compensators.index
+            ]
+            df = self.shunt_data_to_use_in_network.to_df()
+            network.update_shunt_compensators(df=df.loc[df.index.isin(ids_to_consider)])
         else:
             shunt_overrides = {}
             logger.info(
                 f"Shunt compensators: property not set, using all {n_shunt} from network"
             )
-        self.shunt_data_to_use_in_network = ShuntUpdatePayload(
-            updates=[
-                ShuntUpdate(
-                    id=str(i),
-                    **{
-                        **{
-                            k: row[k]
-                            for k in ShuntUpdate.model_fields
-                            if k != "id" and k in row.index
-                        },
-                        **shunt_overrides.get(str(i), {}),
-                    },
-                )
-                for i, row in current_shunt_compensators.iterrows()
-            ]
-        )
 
-        n_pq_gen = len(current_pq_generators)
+        # Update gens...
+
+        n_gen = len(current_generators)
         if self._q_values_for_pq_gens:
-            pq_gen_overrides = {
-                update.id: update.model_dump(exclude={"id"})
-                for update in self._q_values_for_pq_gens.updates
+            gens_overrides = {
+                update.id for update in self.gens_values_to_use_in_network.updates
             }
-            pq_gen_unchanged = [
+            gens_unchanged = [
                 str(i)
-                for i, _ in current_pq_generators.iterrows()
-                if str(i) not in pq_gen_overrides
+                for i, _ in current_generators.iterrows()
+                if str(i) not in gens_overrides
             ]
-            n_pq_gen_overridden = n_pq_gen - len(pq_gen_unchanged)
+            gen_overridden = n_gen - len(gens_unchanged)
             logger.info(
-                f"PQ generators: {n_pq_gen_overridden}/{n_pq_gen} overridden via property"
-                + (f" ({100 * n_pq_gen_overridden // n_pq_gen}%)" if n_pq_gen else "")
+                f"Generators: {gen_overridden}/{n_gen} overridden via property"
+                + (f" ({100 * gen_overridden // n_gen}%)" if n_gen else "")
             )
-            if pq_gen_unchanged:
+            if gens_unchanged:
                 logger.info(
-                    f"PQ generators unchanged (using network values): {pq_gen_unchanged}"
+                    f"Generators unchanged (using network values): {gens_unchanged}"
                 )
-        else:
-            pq_gen_overrides = {}
-            logger.info(
-                f"PQ generators: property not set, using all {n_pq_gen} from network"
-            )
-        self.q_values_for_pq_gens = QUpdatePayload(
-            updates=[
-                QUpdate(
-                    id=str(i),
-                    **{
-                        **{
-                            k: row[k]
-                            for k in QUpdate.model_fields
-                            if k != "id" and k in row.index
-                        },
-                        **pq_gen_overrides.get(str(i), {}),
-                    },
-                )
-                for i, row in current_pq_generators.iterrows()
+            ids_to_consider = [
+                i for i in gens_overrides if i in current_generators.index
             ]
-        )
+            df = self.gens_values_to_use_in_network.to_df()
+            network.update_generators(df=df.loc[df.index.isin(ids_to_consider)])
+        else:
+            gens_overrides = {}
+            logger.info(
+                f"Generators: property not set, using all {n_gen} from network"
+            )
+
+        # Done with elements updates
 
         self._grid = PPBackend(
             network,
@@ -603,27 +567,6 @@ class PyPowSyBlBackend(Backend):
             self.n_busbar_per_sub,
             self._connect_all_elements_to_first_bus,
         )
-
-        phase_taps = self.phase_tap_changers_to_use_in_network
-        ratio_taps = self.ratio_tap_changers_to_use_in_network
-        if isinstance(phase_taps, PhaseTapChangerUpdatePayload) and isinstance(
-            ratio_taps, RatioTapChangerUpdatePayload
-        ):
-            if len(phase_taps.updates) > 0 and len(ratio_taps.updates) > 0:
-                self._update_backend_network_taps_with_taps_to_use_in_network()
-        else:
-            raise ValueError(
-                "Tap ratio and phase to use in the network should be set by now."
-            )
-
-        shunt_data = self.shunt_data_to_use_in_network
-        if isinstance(shunt_data, ShuntUpdatePayload):
-            if len(shunt_data.updates) > 0:
-                self._update_backend_network_shunt_with_shunt_data_to_use_in_network()
-        else:
-            raise ValueError("Shunt data to use in the network should be set by now.")
-
-        self._update_backend_network_gens_q_with_pq_gen_q_values()
 
         # substations mapped to IIDM voltage levels
         self.name_sub = self._grid.get_string_value(  # pyright: ignore[reportAttributeAccessIssue]
