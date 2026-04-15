@@ -301,6 +301,9 @@ class PyPowSyBlBackend(Backend):
             self.n_line,
             self.n_shunt,
         )
+        shunts = self._grid.network.get_shunt_compensators()
+        voltage_levels = self._grid.network.get_voltage_levels()
+        self._sh_vnkv = voltage_levels.loc[shunts["voltage_level_id"], "nominal_v"].to_numpy().copy()
 
     def check_detachment_coherent(self):
         if self._check_isolated_and_disconnected_injections is None:
