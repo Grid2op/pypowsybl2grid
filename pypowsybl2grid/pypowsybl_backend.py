@@ -47,7 +47,9 @@ from pypowsybl2grid.models import (
 
 logger = logging.getLogger("pypowsybl2grid")
 
-DEFAULT_LF_PARAMETERS = Parameters(voltage_init_mode=VoltageInitMode.DC_VALUES)
+DEFAULT_LF_PARAMETERS = Parameters(
+    voltage_init_mode=VoltageInitMode.DC_VALUES
+)
 
 
 class PyPowSyBlBackend(Backend):
@@ -688,26 +690,28 @@ class PyPowSyBlBackend(Backend):
         logger.debug(f"Running {'DC' if is_dc else 'AC'} powerflow")
 
         start_time = time.perf_counter()
-
-        if (
-            self._check_isolated_and_disconnected_injections
-            and self._grid.check_isolated_and_disconnected_injections()
-        ):
-            converged = False
-            converged_msg = f"Issue with _check_isolated_and_disconnected_injections : {self._check_isolated_and_disconnected_injections} and {self._grid.check_isolated_and_disconnected_injections()}"
-        else:
+        converged = True
+        if self._check_isolated_and_disconnected_injections:
+            if self._grid.check_isolated_and_disconnected_injections():
+                converged = False
+                converged_msg = f"Issue with _check_isolated_and_disconnected_injections : {self._check_isolated_and_disconnected_injections} and {self._grid.check_isolated_and_disconnected_injections()}"
+            else:
+                multiple_conn_comp = self._grid.network.get_buses()["connected_component"].max() != 0
+                if multiple_conn_comp:
+                    converged = False
+                    converged_msg = "Multiple connected components detected, this is a game over condition."
+                
+        if converged:
             beg_ = time.perf_counter()
             results = self._grid.run_pf(is_dc, self._lf_parameters)
             end_ = time.perf_counter()
             self.comp_time += end_ - beg_
             converged = self._is_converged(results[0])
             converged_msg = results[0].status_text
-
         if not converged:
             self.set_all_nans()
         else:
             self.fetch_data()
-
         end_time = time.perf_counter()
         elapsed_time = (end_time - start_time) * 1000
         logger.info(f"Powerflow ran in {elapsed_time:.2f} ms")
